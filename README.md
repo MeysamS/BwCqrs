@@ -259,4 +259,202 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 
 ## License
 
-This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details. 
+This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
+
+## PostgreSQL Integration
+
+### PostgreSQL Outbox Pattern Support
+The library provides built-in support for storing and processing internal commands using PostgreSQL as a reliable outbox storage.
+
+### Installation
+
+```bash
+dotnet add package BitWrite.Cqrs.Postgres
+```
+
+### Configuration
+
+Add PostgreSQL support to your CQRS setup:
+
+```csharp
+// In Program.cs or Startup.cs
+services.AddCqrs(options =>
+{
+    options.AddValidation()
+           .AddLogging();
+}, typeof(Program).Assembly);
+
+// Add PostgreSQL support with your connection string
+services.AddPostgresCqrs("Host=localhost;Database=your_db;Username=your_user;Password=your_password");
+```
+
+### Usage Example
+
+```csharp
+// Define an internal command that needs to be processed later
+public class SendWelcomeEmailCommand : InternalCommandBase
+{
+    public string UserEmail { get; set; }
+    public string Username { get; set; }
+}
+
+// Schedule the command for later processing
+public class UserRegistrationService
+{
+    private readonly ICommandBus _commandBus;
+
+    public UserRegistrationService(ICommandBus commandBus)
+    {
+        _commandBus = commandBus;
+    }
+
+    public async Task RegisterUserAsync(string username, string email)
+    {
+        // ... register user ...
+
+        // Schedule welcome email to be sent later
+        var command = new SendWelcomeEmailCommand
+        {
+            Username = username,
+            UserEmail = email
+        };
+
+        // Command will be stored in PostgreSQL and processed by background service
+        await _commandBus.ScheduleAsync(command);
+    }
+}
+
+// Implement the command handler
+public class SendWelcomeEmailCommandHandler : ICommandHandler<SendWelcomeEmailCommand>
+{
+    private readonly IEmailService _emailService;
+
+    public SendWelcomeEmailCommandHandler(IEmailService emailService)
+    {
+        _emailService = emailService;
+    }
+
+    public async Task<IResult> HandleAsync(SendWelcomeEmailCommand command)
+    {
+        await _emailService.SendWelcomeEmailAsync(command.UserEmail, command.Username);
+        return CommandResult.Success();
+    }
+}
+```
+
+### Features
+
+- 🗄️ Reliable storage of internal commands in PostgreSQL
+- 📊 Command state tracking (Scheduled, Processed, Failed)
+- 🔄 Automatic processing through background service
+- 📝 Error logging and handling
+- 🔍 Easy querying of command status
+- ⚡ High performance with Entity Framework Core
+- 🧪 Integration tests with Testcontainers
+
+### Database Schema
+
+The PostgreSQL integration creates the following table:
+
+```sql
+CREATE TABLE internal_commands (
+    id UUID PRIMARY KEY,
+    type VARCHAR(500) NOT NULL,
+    data TEXT NOT NULL,
+    scheduled_on TIMESTAMP NOT NULL,
+    processed_on TIMESTAMP NULL,
+    error VARCHAR(2000) NULL
+);
+```
+
+### Advanced Usage
+
+#### Custom Command Processing Retry Logic
+
+```csharp
+public class CustomInternalCommandProcessor : BackgroundService
+{
+    private readonly IInternalCommandStore _store;
+    private readonly ICommandBus _commandBus;
+    private readonly ILogger<CustomInternalCommandProcessor> _logger;
+
+    public CustomInternalCommandProcessor(
+        IInternalCommandStore store,
+        ICommandBus commandBus,
+        ILogger<CustomInternalCommandProcessor> logger)
+    {
+        _store = store;
+        _commandBus = commandBus;
+        _logger = logger;
+    }
+
+    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
+    {
+        while (!stoppingToken.IsCancellationRequested)
+        {
+            try
+            {
+                var pendingCommands = await _store.GetPendingCommandsAsync();
+                
+                foreach (var command in pendingCommands)
+                {
+                    try
+                    {
+                        await _commandBus.DispatchAsync(command);
+                        await _store.MarkAsProcessedAsync(command.Id);
+                    }
+                    catch (Exception ex)
+                    {
+                        _logger.LogError(ex, "Failed to process command {CommandId}", command.Id);
+                        await _store.MarkAsFailedAsync(command.Id, ex);
+                        // Implement your retry logic here
+                    }
+                }
+
+                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error in command processor");
+                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
+            }
+        }
+    }
+}
+```
+
+#### Monitoring Command Status
+
+```csharp
+public class CommandMonitoringService
+{
+    private readonly CqrsDbContext _dbContext;
+
+    public CommandMonitoringService(CqrsDbContext dbContext)
+    {
+        _dbContext = dbContext;
+    }
+
+    public async Task<CommandStats> GetCommandStatsAsync()
+    {
+        var stats = new CommandStats
+        {
+            TotalCommands = await _dbContext.InternalCommands.CountAsync(),
+            PendingCommands = await _dbContext.InternalCommands
+                .CountAsync(x => x.ProcessedOn == null),
+            FailedCommands = await _dbContext.InternalCommands
+                .CountAsync(x => x.Error != null)
+        };
+
+        return stats;
+    }
+}
+```
+
+### Best Practices
+
+1. **Command Idempotency**: Ensure your command handlers are idempotent as commands might be processed multiple times.
+2. **Error Handling**: Always implement proper error handling in your command handlers.
+3. **Monitoring**: Set up monitoring for failed commands and processing delays.
+4. **Database Maintenance**: Implement a cleanup strategy for processed commands.
+5. **Performance**: Index the `processed_on` column for better query performance. 
