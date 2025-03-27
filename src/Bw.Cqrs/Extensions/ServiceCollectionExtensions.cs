@@ -1,88 +1,64 @@
 ﻿using System.Reflection;
 using Bw.Cqrs.Command.Contract;
-using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Commands.Pipeline.Behaviors;
 using Bw.Cqrs.Commands.Services;
-using Bw.Cqrs.Common.Results;
-using Bw.Cqrs.Queries.Contracts;
-using Bw.Cqrs.Queries.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Scrutor;
+using Bw.Cqrs.Configuration;
 
 namespace Bw.Cqrs.Extensions;
 
 public static class ServiceCollectionExtensions
 {
-    public static IServiceCollection AddCqrs(
-        this IServiceCollection services,
-        Action<CqrsBuilder> configure,
-        params Assembly[] assemblies)
+    public static ICqrsBuilder AddBwCqrs(this IServiceCollection services, Action<ICqrsBuilder> configure, params Assembly[] assemblies)
     {
+        // Register core services
+        services.AddScoped<ICommandBus, DefaultCommandBus>();
+        services.AddScoped<ICommandHandlerFactory, CommandHandlerFactory>();
+        services.AddScoped<IInternalCommandStore, InMemoryInternalCommandStore>();
+
+        // Register command handlers
+        services.Scan(scan => scan
+            .FromAssemblies(assemblies)
+            .AddClasses(classes => classes
+                .AssignableTo(typeof(ICommandHandler<>))
+                .Where(c => !c.IsAbstract && !c.IsGenericType))
+            .AsImplementedInterfaces()
+            .WithScopedLifetime());
+
         var builder = new CqrsBuilder(services, assemblies);
         configure?.Invoke(builder);
 
-        // Register Command Handlers
-        services.Scan(scan =>
-            scan.FromAssemblies(assemblies)
-                .AddClasses(classes => classes.Where(type =>
-                    type.IsAssignableTo(typeof(ICommandHandler<,>)) || 
-                    type.IsAssignableTo(typeof(ICommandHandler<>))))
-                .AsImplementedInterfaces()
-                .WithScopedLifetime());
-
-        // Register Query Handlers
-        services.Scan(scan =>
-            scan.FromAssemblies(assemblies)
-                .AddClasses(classes => classes.AssignableTo(typeof(IQueryHandler<,>)))
-                .AsImplementedInterfaces()
-                .WithScopedLifetime());
-
-        // Register Core Services
-        services.AddScoped<ICommandHandlerFactory, CommandHandlerFactory>();
-        services.AddScoped<ICommandBus, DefaultCommandBus>();
-        services.AddScoped<IQueryHandlerFactory, QueryHandlerFactory>();
-        services.AddScoped<IQueryBus, DefaultQueryBus>();
-
-        return services;
-    }
-}
-
-public class CqrsBuilder
-{
-    private readonly IServiceCollection _services;
-    private readonly Assembly[] _assemblies;
-
-    public CqrsBuilder(IServiceCollection services, Assembly[] assemblies)
-    {
-        _services = services;
-        _assemblies = assemblies;
+        return builder;
     }
 
-    public CqrsBuilder AddValidation()
+    public static ICqrsBuilder AddErrorHandling(this ICqrsBuilder builder)
     {
-        _services.Scan(scan =>
-            scan.FromAssemblies(_assemblies)
-                .AddClasses(classes => classes.AssignableTo(typeof(IValidationHandler<>)))
-                .AsImplementedInterfaces()
-                .WithScopedLifetime());
-        
-        _services.AddScoped(typeof(ICommandPipelineBehavior<>), typeof(ValidationBehavior<>));
-        return this;
+        builder.Services.AddScoped(typeof(ErrorHandlingBehavior<,>));
+        return builder;
     }
 
-    public CqrsBuilder AddLogging()
+    public static ICqrsBuilder AddRetry(this ICqrsBuilder builder, int maxRetries = 3, int delayMilliseconds = 1000)
     {
-        _services.AddScoped(typeof(ICommandPipelineBehavior<,>), typeof(LoggingBehavior<,>));
-        return this;
+        builder.Services.AddScoped(typeof(RetryBehavior<,>));
+        builder.Services.Configure<RetryOptions>(options =>
+        {
+            options.MaxRetries = maxRetries;
+            options.DelayMilliseconds = delayMilliseconds;
+        });
+        return builder;
     }
 
-    public CqrsBuilder AddCustomBehavior<TBehavior, TCommand, TResult>()
-        where TBehavior : class, ICommandPipelineBehavior<TCommand, TResult>
-        where TCommand : ICommand
-        where TResult : IResult
+    public static ICqrsBuilder AddValidation(this ICqrsBuilder builder)
     {
-        _services.AddScoped(typeof(ICommandPipelineBehavior<TCommand, TResult>), typeof(TBehavior));
-        return this;
+        builder.Services.AddScoped(typeof(ValidationBehavior<,>));
+        return builder;
+    }
+
+    public static ICqrsBuilder AddLogging(this ICqrsBuilder builder)
+    {
+        builder.Services.AddScoped(typeof(LoggingBehavior<,>));
+        return builder;
     }
 }
 
