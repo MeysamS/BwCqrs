@@ -5,13 +5,17 @@ A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Seg
 ## Features
 
 ### Command Handling
-- ✨ Strongly-typed command handling
+- ✨ Strongly-typed command handling with base command types (Create, Update, Delete)
 - 🔄 Command pipeline behaviors (middleware)
 - ✅ Built-in validation using FluentValidation
 - 📝 Comprehensive logging support
 - 🔄 Delayed command processing (Outbox pattern)
 - 🎯 Command result handling
 - 🏭 Dependency injection support
+- 🔁 Retry mechanism with configurable policies
+- ⚠️ Sophisticated error handling
+- 📦 Optional command versioning support
+- ⏰ Advanced command scheduling
 
 ### Query Handling
 - 🔍 Strongly-typed query handling
@@ -38,34 +42,46 @@ dotnet add package BitWrite.Cqrs
 ### 1. Register CQRS Services
 
 ```csharp
-services.AddCqrs(options =>
+services.AddBwCqrs(builder =>
 {
-    options.AddValidation()  // Add validation behavior
-           .AddLogging();    // Add logging behavior
+    builder
+        .AddValidation()    // Add validation behavior
+        .AddLogging()       // Add logging behavior
+        .AddErrorHandling() // Add error handling
+        .AddRetry(maxRetries: 3, delayMilliseconds: 1000); // Add retry mechanism
 }, typeof(Program).Assembly);
 ```
 
-### 2. Command Handling Example
+### 2. Command Handling Examples
 
+#### Create Command
 ```csharp
-// Define a command
-public class CreateUserCommand : CommandBase
+// Define the request model
+public class CreateUserRequest
 {
-    public string Username { get; set; }
-    public string Email { get; set; }
+    public string Username { get; set; } = string.Empty;
+    public string Email { get; set; } = string.Empty;
 }
 
-// Define command validation
+// Define the command
+public class CreateUserCommand : CreateCommand<CreateUserRequest>
+{
+    public CreateUserCommand(CreateUserRequest data) : base(data)
+    {
+    }
+}
+
+// Add validation
 public class CreateUserCommandValidator : AbstractValidator<CreateUserCommand>
 {
     public CreateUserCommandValidator()
     {
-        RuleFor(x => x.Username).NotEmpty().MinimumLength(3);
-        RuleFor(x => x.Email).NotEmpty().EmailAddress();
+        RuleFor(x => x.Data.Username).NotEmpty().MinimumLength(3);
+        RuleFor(x => x.Data.Email).NotEmpty().EmailAddress();
     }
 }
 
-// Implement command handler
+// Implement the handler
 public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
 {
     private readonly IUserRepository _userRepository;
@@ -77,13 +93,122 @@ public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
 
     public async Task<IResult> HandleAsync(CreateUserCommand command)
     {
-        var user = new User(command.Username, command.Email);
+        var user = new User(command.Data.Username, command.Data.Email);
         await _userRepository.AddAsync(user);
         return CommandResult.Success();
     }
 }
+```
 
-// Use in your application
+#### Update Command
+```csharp
+public class UpdateUserRequest
+{
+    public string? Email { get; set; }
+    public bool NewsletterSubscription { get; set; }
+}
+
+public class UpdateUserCommand : UpdateCommand<UpdateUserRequest>
+{
+    public UpdateUserCommand(Guid userId, UpdateUserRequest data) : base(userId, data)
+    {
+    }
+}
+
+public class UpdateUserCommandHandler : ICommandHandler<UpdateUserCommand>
+{
+    private readonly IUserRepository _userRepository;
+
+    public UpdateUserCommandHandler(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    public async Task<IResult> HandleAsync(UpdateUserCommand command)
+    {
+        var user = await _userRepository.GetByIdAsync(command.EntityId);
+        if (user == null)
+            return CommandResult.Failure("User not found");
+
+        if (command.Data.Email != null)
+            user.UpdateEmail(command.Data.Email);
+        
+        user.SetNewsletterPreference(command.Data.NewsletterSubscription);
+        
+        await _userRepository.UpdateAsync(user);
+        return CommandResult.Success();
+    }
+}
+```
+
+#### Delete Command
+```csharp
+public class DeleteUserCommand : DeleteCommand
+{
+    public DeleteUserCommand(Guid userId) : base(userId)
+    {
+    }
+}
+
+public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand>
+{
+    private readonly IUserRepository _userRepository;
+
+    public DeleteUserCommandHandler(IUserRepository userRepository)
+    {
+        _userRepository = userRepository;
+    }
+
+    public async Task<IResult> HandleAsync(DeleteUserCommand command)
+    {
+        var user = await _userRepository.GetByIdAsync(command.EntityId);
+        if (user == null)
+            return CommandResult.Failure("User not found");
+
+        await _userRepository.DeleteAsync(user);
+        return CommandResult.Success();
+    }
+}
+```
+
+### 3. Using Command Versioning
+
+When you need to version your commands, you can implement the `IVersionedCommand` interface:
+
+```csharp
+public class CreateUserCommand : CreateCommand<CreateUserRequest>, IVersionedCommand
+{
+    public int Version { get; }
+
+    public CreateUserCommand(CreateUserRequest data, int version = 1) : base(data)
+    {
+        Version = version;
+    }
+}
+
+public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
+{
+    public async Task<IResult> HandleAsync(CreateUserCommand command)
+    {
+        var user = new User(command.Data.Username, command.Data.Email);
+        
+        if (command.Version >= 2)
+        {
+            // Handle version 2 specific logic
+            user.SetNewsletterPreference(command.Data.SubscribeToNewsletter);
+        }
+
+        await _userRepository.AddAsync(user);
+        return CommandResult.Success();
+    }
+}
+```
+
+### 4. Error Handling and Retries
+
+The library includes built-in error handling and retry mechanisms:
+
+```csharp
 public class UserService
 {
     private readonly ICommandBus _commandBus;
@@ -93,165 +218,58 @@ public class UserService
         _commandBus = commandBus;
     }
 
-    public async Task CreateUserAsync(string username, string email)
+    public async Task CreateUserAsync(CreateUserRequest request)
     {
-        var command = new CreateUserCommand 
-        { 
-            Username = username, 
-            Email = email 
-        };
-        
-        await _commandBus.DispatchAsync(command);
-    }
-}
-```
-
-### 3. Query Handling Example
-
-```csharp
-// Define a query
-public class GetUserByIdQuery : IQuery<UserDto>
-{
-    public Guid UserId { get; set; }
-}
-
-// Implement query handler
-public class GetUserByIdQueryHandler : IQueryHandler<GetUserByIdQuery, UserDto>
-{
-    private readonly IUserRepository _userRepository;
-
-    public GetUserByIdQueryHandler(IUserRepository userRepository)
-    {
-        _userRepository = userRepository;
-    }
-
-    public async Task<UserDto> HandleAsync(GetUserByIdQuery query)
-    {
-        var user = await _userRepository.GetByIdAsync(query.UserId);
-        return user?.ToDto();
-    }
-}
-
-// Use in your application
-public class UserService
-{
-    private readonly IQueryBus _queryBus;
-
-    public UserService(IQueryBus queryBus)
-    {
-        _queryBus = queryBus;
-    }
-
-    public async Task<UserDto> GetUserAsync(Guid userId)
-    {
-        var query = new GetUserByIdQuery { UserId = userId };
-        return await _queryBus.SendAsync(query);
-    }
-}
-```
-
-### 4. Delayed Command Processing (Outbox Pattern)
-
-```csharp
-// Define an internal command
-public class SendWelcomeEmailCommand : InternalCommandBase
-{
-    public string UserEmail { get; set; }
-    public string Username { get; set; }
-}
-
-// Implement handler
-public class SendWelcomeEmailCommandHandler : ICommandHandler<SendWelcomeEmailCommand>
-{
-    private readonly IEmailService _emailService;
-
-    public SendWelcomeEmailCommandHandler(IEmailService emailService)
-    {
-        _emailService = emailService;
-    }
-
-    public async Task<IResult> HandleAsync(SendWelcomeEmailCommand command)
-    {
-        await _emailService.SendWelcomeEmailAsync(command.UserEmail, command.Username);
-        return CommandResult.Success();
-    }
-}
-
-// Schedule command for later processing
-public class UserRegistrationService
-{
-    private readonly ICommandBus _commandBus;
-
-    public UserRegistrationService(ICommandBus commandBus)
-    {
-        _commandBus = commandBus;
-    }
-
-    public async Task RegisterUserAsync(string username, string email)
-    {
-        // ... register user ...
-
-        var command = new SendWelcomeEmailCommand
-        {
-            Username = username,
-            UserEmail = email
-        };
-
-        await _commandBus.ScheduleAsync(command);
-    }
-}
-```
-
-## Advanced Features
-
-### Custom Pipeline Behaviors
-
-```csharp
-public class TransactionBehavior<TCommand> : ICommandPipelineBehavior<TCommand, IResult>
-    where TCommand : ICommand
-{
-    private readonly IUnitOfWork _unitOfWork;
-
-    public TransactionBehavior(IUnitOfWork unitOfWork)
-    {
-        _unitOfWork = unitOfWork;
-    }
-
-    public async Task<IResult> HandleAsync(
-        TCommand command,
-        CancellationToken cancellationToken,
-        CommandHandlerDelegate<IResult> next)
-    {
-        using var transaction = await _unitOfWork.BeginTransactionAsync();
         try
         {
-            var result = await next();
-            await transaction.CommitAsync();
-            return result;
+            var command = new CreateUserCommand(request);
+            // ErrorHandlingBehavior will catch and process any errors
+            // RetryBehavior will automatically retry on transient failures
+            await _commandBus.DispatchAsync(command);
         }
-        catch
+        catch (CommandRetryException ex)
         {
-            await transaction.RollbackAsync();
-            throw;
+            // Handle after all retries have failed
         }
     }
 }
-
-// Register in startup
-services.AddCqrs(options =>
-{
-    options.AddCustomBehavior<TransactionBehavior<CreateUserCommand>, CreateUserCommand, IResult>();
-});
 ```
 
 ## Best Practices
 
-1. **Command Naming**: Use imperative verb phrases (e.g., `CreateUser`, `UpdateProfile`)
-2. **Query Naming**: Use noun phrases (e.g., `UserById`, `ActiveUsers`)
-3. **Validation**: Always validate commands before processing
-4. **Error Handling**: Use `CommandResult` for consistent error handling
-5. **Logging**: Enable logging behavior for better debugging
-6. **Testing**: Write unit tests for command and query handlers
+1. **Command Structure**: 
+   - Use `CreateCommand<T>` for creation operations
+   - Use `UpdateCommand<T>` for update operations
+   - Use `DeleteCommand` for delete operations
+
+2. **Command Naming**: 
+   - Use imperative verb phrases (e.g., `CreateUser`, `UpdateProfile`)
+   - Keep command names clear and descriptive
+
+3. **Request Models**:
+   - Create separate request models for commands
+   - Keep request models immutable when possible
+   - Include only necessary data
+
+4. **Validation**:
+   - Always validate commands before processing
+   - Use FluentValidation for complex validation rules
+   - Validate at the command level, not just the request model
+
+5. **Error Handling**:
+   - Use the built-in error handling behavior
+   - Return appropriate CommandResults
+   - Log errors with proper context
+
+6. **Versioning**:
+   - Implement IVersionedCommand only when needed
+   - Handle version-specific logic in command handlers
+   - Document version changes
+
+7. **Testing**:
+   - Write unit tests for command handlers
+   - Test validation rules
+   - Test different versions if using versioning
 
 ## Contributing
 
