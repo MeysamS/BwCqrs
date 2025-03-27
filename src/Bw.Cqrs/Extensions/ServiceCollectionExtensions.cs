@@ -5,6 +5,8 @@ using Bw.Cqrs.Commands.Services;
 using Microsoft.Extensions.DependencyInjection;
 using Scrutor;
 using Bw.Cqrs.Configuration;
+using Bw.Cqrs.Events.Contracts;
+using Bw.Cqrs.Events.Services;
 
 namespace Bw.Cqrs.Extensions;
 
@@ -21,9 +23,8 @@ public static class ServiceCollectionExtensions
         services.Scan(scan => scan
             .FromAssemblies(assemblies)
             .AddClasses(classes => classes
-                .AssignableTo(typeof(ICommandHandler<>))
-                .Where(c => !c.IsAbstract && !c.IsGenericType))
-            .AsImplementedInterfaces()
+                .AssignableTo(typeof(ICommandHandler<>)))
+            .AsClosedTypeOf(typeof(ICommandHandler<>))
             .WithScopedLifetime());
 
         var builder = new CqrsBuilder(services, assemblies);
@@ -58,6 +59,21 @@ public static class ServiceCollectionExtensions
     public static ICqrsBuilder AddLogging(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped(typeof(LoggingBehavior<,>));
+        return builder;
+    }
+
+    public static ICqrsBuilder AddEventHandling(this ICqrsBuilder builder)
+    {
+        builder.Services.AddScoped<IEventBus, InMemoryEventBus>();
+        
+        // Register event handlers
+        builder.Services.Scan(scan => scan
+            .FromAssemblies(builder.Assemblies)
+            .AddClasses(classes => classes
+                .AssignableTo(typeof(IEventHandler<>)))
+            .AsClosedTypeOf(typeof(IEventHandler<>))
+            .WithScopedLifetime());
+
         return builder;
     }
 }

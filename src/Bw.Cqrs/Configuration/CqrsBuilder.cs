@@ -9,32 +9,30 @@ namespace Bw.Cqrs.Configuration;
 
 public class CqrsBuilder : ICqrsBuilder
 {
-    private readonly IServiceCollection _services;
-    private readonly Assembly[] _assemblies;
+    public IServiceCollection Services { get; }
+    public IEnumerable<Assembly> Assemblies { get; }
 
-    public IServiceCollection Services => _services;
-
-    public CqrsBuilder(IServiceCollection services, Assembly[] assemblies)
+    public CqrsBuilder(IServiceCollection services, IEnumerable<Assembly> assemblies)
     {
-        _services = services;
-        _assemblies = assemblies;
+        Services = services ?? throw new ArgumentNullException(nameof(services));
+        Assemblies = assemblies ?? throw new ArgumentNullException(nameof(assemblies));
     }
 
     public CqrsBuilder AddValidation()
     {
-        _services.Scan(scan =>
-            scan.FromAssemblies(_assemblies)
+        Services.Scan(scan =>
+            scan.FromAssemblies(Assemblies)
                 .AddClasses(classes => classes.AssignableTo(typeof(IValidationHandler<>)))
                 .AsImplementedInterfaces()
                 .WithScopedLifetime());
         
-        _services.AddScoped(typeof(ICommandPipelineBehavior<>), typeof(ValidationBehavior<>));
+        Services.AddScoped(typeof(ICommandPipelineBehavior<>), typeof(ValidationBehavior<>));
         return this;
     }
 
     public CqrsBuilder AddLogging()
     {
-        _services.AddScoped(typeof(ICommandPipelineBehavior<,>), typeof(LoggingBehavior<,>));
+        Services.AddScoped(typeof(ICommandPipelineBehavior<,>), typeof(LoggingBehavior<,>));
         return this;
     }
 
@@ -43,7 +41,7 @@ public class CqrsBuilder : ICqrsBuilder
         where TCommand : ICommand
         where TResult : IResult
     {
-        _services.AddScoped(typeof(ICommandPipelineBehavior<TCommand, TResult>), typeof(TBehavior));
+        Services.AddScoped(typeof(ICommandPipelineBehavior<TCommand, TResult>), typeof(TBehavior));
         return this;
     }
 }
