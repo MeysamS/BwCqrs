@@ -31,6 +31,14 @@ A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Seg
 - 📝 Comprehensive logging
 - ⚡ High performance
 
+### Event Handling
+- 🔔 Simple and lightweight event publishing
+- 👥 Multiple event handlers support
+- 🔄 Automatic handler registration
+- 📝 Built-in logging
+- ⚡ Asynchronous event processing
+- 🛡️ Error handling and resilience
+
 ## Installation
 
 ```bash
@@ -171,68 +179,119 @@ public class DeleteUserCommandHandler : ICommandHandler<DeleteUserCommand>
 }
 ```
 
-### 3. Using Command Versioning
+### 3. Event Handling Examples
 
-When you need to version your commands, you can implement the `IVersionedCommand` interface:
-
+#### Define an Event
 ```csharp
-public class CreateUserCommand : CreateCommand<CreateUserRequest>, IVersionedCommand
+public class UserCreatedEvent : Event
 {
-    public int Version { get; }
+    public string Username { get; }
+    public string Email { get; }
 
-    public CreateUserCommand(CreateUserRequest data, int version = 1) : base(data)
+    public UserCreatedEvent(string username, string email)
     {
-        Version = version;
+        Username = username;
+        Email = email;
     }
 }
+```
 
+#### Implement Event Handler
+```csharp
+public class SendWelcomeEmailHandler : IEventHandler<UserCreatedEvent>
+{
+    private readonly IEmailService _emailService;
+    private readonly ILogger<SendWelcomeEmailHandler> _logger;
+
+    public SendWelcomeEmailHandler(
+        IEmailService emailService,
+        ILogger<SendWelcomeEmailHandler> logger)
+    {
+        _emailService = emailService;
+        _logger = logger;
+    }
+
+    public async Task HandleAsync(UserCreatedEvent @event, CancellationToken cancellationToken = default)
+    {
+        try
+        {
+            await _emailService.SendWelcomeEmailAsync(@event.Email, @event.Username);
+            _logger.LogInformation(
+                "Welcome email sent to user {Username} at {Email}", 
+                @event.Username, 
+                @event.Email);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(
+                ex,
+                "Failed to send welcome email to user {Username}", 
+                @event.Username);
+            throw;
+        }
+    }
+}
+```
+
+#### Multiple Handlers for Same Event
+```csharp
+public class NotifyAdminHandler : IEventHandler<UserCreatedEvent>
+{
+    private readonly INotificationService _notificationService;
+
+    public NotifyAdminHandler(INotificationService notificationService)
+    {
+        _notificationService = notificationService;
+    }
+
+    public async Task HandleAsync(UserCreatedEvent @event, CancellationToken cancellationToken = default)
+    {
+        await _notificationService.NotifyAdminAsync($"New user registered: {@event.Username}");
+    }
+}
+```
+
+#### Publishing Events
+```csharp
 public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
 {
+    private readonly IUserRepository _userRepository;
+    private readonly IEventBus _eventBus;
+
+    public CreateUserCommandHandler(
+        IUserRepository userRepository,
+        IEventBus eventBus)
+    {
+        _userRepository = userRepository;
+        _eventBus = eventBus;
+    }
+
     public async Task<IResult> HandleAsync(CreateUserCommand command)
     {
         var user = new User(command.Data.Username, command.Data.Email);
-        
-        if (command.Version >= 2)
-        {
-            // Handle version 2 specific logic
-            user.SetNewsletterPreference(command.Data.SubscribeToNewsletter);
-        }
-
         await _userRepository.AddAsync(user);
+
+        // Publish the event
+        var @event = new UserCreatedEvent(user.Username, user.Email);
+        await _eventBus.PublishAsync(@event);
+
         return CommandResult.Success();
     }
 }
 ```
 
-### 4. Error Handling and Retries
-
-The library includes built-in error handling and retry mechanisms:
+### 4. Register Event Handling
 
 ```csharp
-public class UserService
+services.AddBwCqrs(builder =>
 {
-    private readonly ICommandBus _commandBus;
-
-    public UserService(ICommandBus commandBus)
-    {
-        _commandBus = commandBus;
-    }
-
-    public async Task CreateUserAsync(CreateUserRequest request)
-    {
-        try
-        {
-            var command = new CreateUserCommand(request);
-            // ErrorHandlingBehavior will catch and process any errors
-            // RetryBehavior will automatically retry on transient failures
-            await _commandBus.DispatchAsync(command);
-        }
-        catch (CommandRetryException ex)
-        {
-            // Handle after all retries have failed
-        }
-    }
-}
+    builder
+        .AddValidation()
+        .AddLogging()
+        .AddErrorHandling()
+        .AddRetry()
+        .AddEventHandling(); // Enable event handling support
+}, typeof(Program).Assembly);
 ```
 
 ## Best Practices
@@ -270,6 +329,36 @@ public class UserService
    - Write unit tests for command handlers
    - Test validation rules
    - Test different versions if using versioning
+
+### Event Handling Best Practices
+
+1. **Event Naming**:
+   - Use past tense for event names (e.g., `UserCreated`, `OrderPlaced`)
+   - Make names descriptive and meaningful
+   - Follow the `[Entity][Action]Event` pattern
+
+2. **Event Design**:
+   - Keep events immutable
+   - Include only necessary data
+   - Consider versioning needs
+   - Make events self-contained
+
+3. **Event Handlers**:
+   - Follow Single Responsibility Principle
+   - Handle errors appropriately
+   - Keep handlers independent
+   - Add proper logging
+
+4. **Event Publishing**:
+   - Publish events after successful operations
+   - Consider transactional boundaries
+   - Handle publishing failures gracefully
+
+5. **Testing**:
+   - Test event handlers in isolation
+   - Mock event bus in command handlers
+   - Verify event publishing
+   - Test error scenarios
 
 ## Contributing
 
