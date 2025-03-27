@@ -1,6 +1,6 @@
 # BitWrite CQRS Library
 
-A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Segregation) implementation for .NET applications. This library provides a clean and maintainable way to separate read and write operations in your application.
+A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Segregation) framework built for .NET 9, designed to help you build scalable and maintainable applications. This library provides a clean, modern, and high-performance foundation for implementing the CQRS pattern with a focus on developer experience, performance, and enterprise-grade features.
 
 ## Features
 
@@ -16,6 +16,13 @@ A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Seg
 - ⚠️ Sophisticated error handling
 - 📦 Optional command versioning support
 - ⏰ Advanced command scheduling
+- 📊 Internal command processing with:
+  - Background service for processing
+  - Configurable retry policies
+  - Automatic cleanup of old commands
+  - Command status tracking
+  - Command statistics
+  - Extensible storage providers
 
 ### Query Handling
 - 🔍 Strongly-typed query handling
@@ -294,6 +301,94 @@ services.AddBwCqrs(builder =>
 }, typeof(Program).Assembly);
 ```
 
+### 5. Internal Commands
+
+Internal commands allow you to schedule commands for later execution. They are processed by a background service and support retry policies and status tracking.
+
+```csharp
+// Define an internal command
+public class SendEmailCommand : InternalCommand
+{
+    public string To { get; }
+    public string Subject { get; }
+    public string Body { get; }
+
+    public SendEmailCommand(string to, string subject, string body)
+    {
+        To = to;
+        Subject = subject;
+        Body = body;
+    }
+}
+
+// Configure internal commands with custom options
+services.AddBwCqrs(builder =>
+{
+    builder
+        .AddInternalCommands(options =>
+        {
+            options.MaxRetries = 3;
+            options.RetryDelaySeconds = 60;
+            options.ProcessingIntervalSeconds = 10;
+            options.RetentionDays = 7;
+        })
+        .UseInMemory(); // Use in-memory storage
+}, typeof(Program).Assembly);
+
+// Use in your code
+public class EmailService
+{
+    private readonly ICommandBus _commandBus;
+
+    public EmailService(ICommandBus commandBus)
+    {
+        _commandBus = commandBus;
+    }
+
+    public async Task ScheduleEmailAsync(string to, string subject, string body)
+    {
+        var command = new SendEmailCommand(to, subject, body);
+        await _commandBus.ScheduleAsync(command);
+    }
+}
+```
+
+### Storage Providers
+
+The library supports different storage providers for internal commands. By default, it uses in-memory storage, but you can add support for other databases by installing additional packages:
+
+```csharp
+// Using in-memory storage (default)
+builder.AddInternalCommands().UseInMemory();
+
+// Using PostgreSQL (requires Bw.Cqrs.Commands.Postgres package)
+builder.AddInternalCommands().UsePostgres(options => 
+{
+    options.ConnectionString = "your_connection_string";
+});
+
+// Using MongoDB (requires Bw.Cqrs.Commands.Mongo package)
+builder.AddInternalCommands().UseMongo(options => 
+{
+    options.ConnectionString = "your_connection_string";
+    options.DatabaseName = "your_database";
+});
+```
+
+### Configuration Options
+
+#### Internal Command Options
+
+```csharp
+builder.AddInternalCommands(options =>
+{
+    options.MaxRetries = 3;                    // Maximum number of retry attempts
+    options.RetryDelaySeconds = 60;            // Delay between retry attempts
+    options.ProcessingIntervalSeconds = 10;     // How often to check for pending commands
+    options.RetentionDays = 7;                 // How long to keep processed commands
+});
+```
+
 ## Best Practices
 
 1. **Command Structure**: 
@@ -376,7 +471,7 @@ The library provides built-in support for storing and processing internal comman
 ### Installation
 
 ```bash
-dotnet add package BitWrite.Cqrs.Postgres
+dotnet add package Bw.Cqrs.InternalCommand.Postgres
 ```
 
 ### Configuration
@@ -384,25 +479,61 @@ dotnet add package BitWrite.Cqrs.Postgres
 Add PostgreSQL support to your CQRS setup:
 
 ```csharp
-// In Program.cs or Startup.cs
-services.AddCqrs(options =>
+services.AddBwCqrs(builder =>
 {
-    options.AddValidation()
-           .AddLogging();
+    builder
+        .AddValidation()
+        .AddLogging()
+        .AddInternalCommands()
+        .UsePostgres(options =>
+        {
+            options.ConnectionString = "Host=localhost;Database=your_db;Username=your_user;Password=your_password";
+            options.CommandTimeout = TimeSpan.FromSeconds(30);
+            options.EnableDetailedErrors = true;
+            options.EnableSensitiveDataLogging = false;
+        });
 }, typeof(Program).Assembly);
+```
 
-// Add PostgreSQL support with your connection string
-services.AddPostgresCqrs("Host=localhost;Database=your_db;Username=your_user;Password=your_password");
+### Features
+
+- 🗄️ Reliable storage of internal commands in PostgreSQL
+- 📊 Command state tracking (Scheduled, Processing, Processed, Failed, Cancelled)
+- 🔄 Automatic processing through background service
+- 📝 Error logging and handling
+- 🔍 Easy querying of command status
+- ⚡ High performance with Entity Framework Core
+- 🧪 Integration tests with Testcontainers
+- 🔒 Configurable command timeout and retry policies
+- 📈 Built-in command statistics and monitoring
+
+### Database Schema
+
+The PostgreSQL integration creates the following table:
+
+```sql
+CREATE TABLE internal_commands (
+    id UUID PRIMARY KEY,
+    type VARCHAR(500) NOT NULL,
+    data TEXT NOT NULL,
+    scheduled_on TIMESTAMP NOT NULL,
+    processed_on TIMESTAMP NULL,
+    retry_count INT NOT NULL DEFAULT 0,
+    error VARCHAR(2000) NULL,
+    status VARCHAR(50) NOT NULL,
+    created_at TIMESTAMP NOT NULL,
+    last_retry_at TIMESTAMP NULL
+);
 ```
 
 ### Usage Example
 
 ```csharp
 // Define an internal command that needs to be processed later
-public class SendWelcomeEmailCommand : InternalCommandBase
+public class SendWelcomeEmailCommand : InternalCommand
 {
-    public string UserEmail { get; set; }
-    public string Username { get; set; }
+    public string UserEmail { get; set; } = string.Empty;
+    public string Username { get; set; } = string.Empty;
 }
 
 // Schedule the command for later processing
@@ -449,31 +580,6 @@ public class SendWelcomeEmailCommandHandler : ICommandHandler<SendWelcomeEmailCo
 }
 ```
 
-### Features
-
-- 🗄️ Reliable storage of internal commands in PostgreSQL
-- 📊 Command state tracking (Scheduled, Processed, Failed)
-- 🔄 Automatic processing through background service
-- 📝 Error logging and handling
-- 🔍 Easy querying of command status
-- ⚡ High performance with Entity Framework Core
-- 🧪 Integration tests with Testcontainers
-
-### Database Schema
-
-The PostgreSQL integration creates the following table:
-
-```sql
-CREATE TABLE internal_commands (
-    id UUID PRIMARY KEY,
-    type VARCHAR(500) NOT NULL,
-    data TEXT NOT NULL,
-    scheduled_on TIMESTAMP NOT NULL,
-    processed_on TIMESTAMP NULL,
-    error VARCHAR(2000) NULL
-);
-```
-
 ### Advanced Usage
 
 #### Custom Command Processing Retry Logic
@@ -501,19 +607,20 @@ public class CustomInternalCommandProcessor : BackgroundService
         {
             try
             {
-                var pendingCommands = await _store.GetPendingCommandsAsync();
+                var pendingCommands = await _store.GetCommandsToExecuteAsync();
                 
                 foreach (var command in pendingCommands)
                 {
                     try
                     {
+                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processing);
                         await _commandBus.DispatchAsync(command);
-                        await _store.MarkAsProcessedAsync(command.Id);
+                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processed);
                     }
                     catch (Exception ex)
                     {
                         _logger.LogError(ex, "Failed to process command {CommandId}", command.Id);
-                        await _store.MarkAsFailedAsync(command.Id, ex);
+                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Failed, ex.Message);
                         // Implement your retry logic here
                     }
                 }
@@ -535,25 +642,16 @@ public class CustomInternalCommandProcessor : BackgroundService
 ```csharp
 public class CommandMonitoringService
 {
-    private readonly CqrsDbContext _dbContext;
+    private readonly IInternalCommandStore _store;
 
-    public CommandMonitoringService(CqrsDbContext dbContext)
+    public CommandMonitoringService(IInternalCommandStore store)
     {
-        _dbContext = dbContext;
+        _store = store;
     }
 
-    public async Task<CommandStats> GetCommandStatsAsync()
+    public async Task<InternalCommandStats> GetCommandStatsAsync()
     {
-        var stats = new CommandStats
-        {
-            TotalCommands = await _dbContext.InternalCommands.CountAsync(),
-            PendingCommands = await _dbContext.InternalCommands
-                .CountAsync(x => x.ProcessedOn == null),
-            FailedCommands = await _dbContext.InternalCommands
-                .CountAsync(x => x.Error != null)
-        };
-
-        return stats;
+        return await _store.GetStatsAsync();
     }
 }
 ```
@@ -564,4 +662,6 @@ public class CommandMonitoringService
 2. **Error Handling**: Always implement proper error handling in your command handlers.
 3. **Monitoring**: Set up monitoring for failed commands and processing delays.
 4. **Database Maintenance**: Implement a cleanup strategy for processed commands.
-5. **Performance**: Index the `processed_on` column for better query performance. 
+5. **Performance**: Index the `status` and `scheduled_on` columns for better query performance.
+6. **Configuration**: Use appropriate timeouts and retry policies based on your application needs.
+7. **Testing**: Write both unit tests and integration tests for your command handlers and storage implementation.
