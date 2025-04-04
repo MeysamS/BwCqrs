@@ -7,11 +7,18 @@ using Scrutor;
 using Bw.Cqrs.Configuration;
 using Bw.Cqrs.Events.Contracts;
 using Bw.Cqrs.Events.Services;
+using Bw.Cqrs.Commands.Configuration;
+using Bw.Cqrs.Commands.Contracts;
 
 namespace Bw.Cqrs.Extensions;
 
 public static class ServiceCollectionExtensions
 {
+    /// <summary>
+    /// Adds event handling support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddBwCqrs(this IServiceCollection services, Action<ICqrsBuilder> configure, params Assembly[] assemblies)
     {
         // Register core services
@@ -62,10 +69,15 @@ public static class ServiceCollectionExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Adds event handling support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddEventHandling(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped<IEventBus, InMemoryEventBus>();
-        
+
         // Register event handlers
         builder.Services.Scan(scan => scan
             .FromAssemblies(builder.Assemblies)
@@ -75,6 +87,29 @@ public static class ServiceCollectionExtensions
             .WithScopedLifetime());
 
         return builder;
+    }
+
+    /// <summary>
+    /// Adds internal command processing support
+    /// </summary>
+    public static InternalCommandStorageBuilder AddInternalCommands(
+        this ICqrsBuilder builder,
+        Action<InternalCommandOptions>? configureOptions = null)
+    {
+        // Configure options
+        if (configureOptions != null)
+        {
+            builder.Services.Configure(configureOptions);
+        }
+        else
+        {
+            builder.Services.Configure<InternalCommandOptions>(options => { });
+        }
+
+        // Add the processor service
+        builder.Services.AddHostedService<InternalCommandProcessor>();
+
+        return new InternalCommandStorageBuilder(builder.Services, builder);
     }
 }
 
