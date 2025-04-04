@@ -389,6 +389,118 @@ builder.AddInternalCommands(options =>
 });
 ```
 
+### PostgreSQL Integration
+
+The library provides built-in support for storing and processing internal commands using PostgreSQL as a reliable outbox storage.
+
+#### Installation
+
+```bash
+dotnet add package Bw.Cqrs.InternalCommands.Postgres
+```
+
+#### Database Setup
+
+1. Create a `Scripts` folder in your infrastructure project
+2. Add the following SQL script as `CreateInternalCommandsTable.sql`:
+
+```sql
+-- Create internal_commands table
+CREATE TABLE IF NOT EXISTS internal_commands (
+    "Id" UUID PRIMARY KEY,
+    "Type" VARCHAR(500) NOT NULL,
+    "Data" TEXT NOT NULL,
+    "ScheduledOn" TIMESTAMP NOT NULL,
+    "ProcessedOn" TIMESTAMP,
+    "RetryCount" INTEGER NOT NULL DEFAULT 0,
+    "Error" VARCHAR(2000),
+    "Status" INTEGER NOT NULL,
+    "CreatedAt" TIMESTAMP NOT NULL,
+    "LastRetryAt" TIMESTAMP
+);
+
+-- Create indexes
+CREATE INDEX IF NOT EXISTS idx_internal_commands_status ON internal_commands("Status");
+CREATE INDEX IF NOT EXISTS idx_internal_commands_scheduled_on ON internal_commands("ScheduledOn");
+CREATE INDEX IF NOT EXISTS idx_internal_commands_processed_on ON internal_commands("ProcessedOn");
+```
+
+3. Add the script to your project file:
+
+```xml
+<ItemGroup>
+    <Content Include="Scripts\CreateInternalCommandsTable.sql">
+        <CopyToOutputDirectory>PreserveNewest</CopyToOutputDirectory>
+    </Content>
+</ItemGroup>
+```
+
+4. Execute the script during application startup:
+
+```csharp
+// In Program.cs or Startup.cs
+using (var scope = app.Services.CreateScope())
+{
+    var dbContext = scope.ServiceProvider.GetRequiredService<YourDbContext>();
+    
+    // Execute internal commands table creation script
+    var scriptPath = Path.Combine(AppContext.BaseDirectory, "Scripts", "CreateInternalCommandsTable.sql");
+    if (File.Exists(scriptPath))
+    {
+        var script = File.ReadAllText(scriptPath);
+        dbContext.Database.ExecuteSqlRaw(script);
+    }
+}
+```
+
+#### Configuration
+
+Add PostgreSQL support to your CQRS setup:
+
+```csharp
+services.AddBwCqrs(builder =>
+{
+    builder
+        .AddValidation()
+        .AddLogging()
+        .AddErrorHandling()
+        .AddRetry(maxRetries: 3, delayMilliseconds: 1000)
+        .AddEventHandling()
+        .AddInternalCommands(options =>
+        {
+            options.MaxRetries = 3;
+            options.RetryDelaySeconds = 60;
+            options.ProcessingIntervalSeconds = 10;
+            options.RetentionDays = 7;
+        })
+        .UsePostgres(options =>
+        {
+            options.ConnectionString = connectionString;
+            options.CommandTimeout = TimeSpan.FromSeconds(30);
+            options.EnableDetailedErrors = true;
+            options.EnableSensitiveDataLogging = false;
+        });
+}, typeof(Program).Assembly);
+```
+
+#### Important Notes
+
+1. The `internal_commands` table must be created in your database before using the package
+2. Make sure your connection string has the necessary permissions to create tables and indexes
+3. The package uses the same connection string as your main application database
+4. Internal commands are processed asynchronously by a background service
+5. **Column Naming**: PostgreSQL column names are case-sensitive when quoted. The `InternalCommandProcessor` expects column names with specific casing (e.g., "Id", "Type", "Data"). Always use the exact column names as shown in the SQL script to avoid errors like `column i.Id does not exist`.
+
+#### Troubleshooting
+
+If you encounter any issues:
+
+1. Check if the `internal_commands` table exists in your database
+2. Verify that your connection string is correct
+3. Ensure all required indexes are created
+4. Check the application logs for any error messages
+5. If you see errors like `column i.Id does not exist`, make sure your column names match exactly with the ones in the SQL script (including casing and quotes)
+
 ## Best Practices
 
 1. **Command Structure**: 
@@ -455,6 +567,210 @@ builder.AddInternalCommands(options =>
    - Verify event publishing
    - Test error scenarios
 
+## Sample Project: OrderManagement
+
+The library includes a sample project called `OrderManagement` that demonstrates how to use Bw.Cqrs in a real-world application. This project implements a simple order management system with the following features:
+
+### Project Structure
+
+```
+OrderManagement/
+├── OrderManagement.API/              # API layer with controllers and configuration
+├── OrderManagement.Application/      # Application layer with commands, queries, and handlers
+├── OrderManagement.Domain/           # Domain layer with entities and interfaces
+├── OrderManagement.Infrastructure/   # Infrastructure layer with repositories and persistence
+└── OrderManagement.IntegrationTests/ # Integration tests
+```
+
+### Key Components
+
+1. **Domain Layer**:
+   - `Order` and `OrderItem` entities
+   - Repository interfaces (`IOrderRepository`)
+
+2. **Application Layer**:
+   - Commands: `CreateOrderCommand`, `UpdateOrderCommand`, `DeleteOrderCommand`
+   - Queries: `GetOrderByIdQuery`, `GetAllOrdersQuery`
+   - Command and Query handlers
+   - Validators using FluentValidation
+
+3. **Infrastructure Layer**:
+   - Entity Framework Core implementation of repositories
+   - PostgreSQL database configuration
+   - Internal commands setup with PostgreSQL storage
+
+4. **API Layer**:
+   - RESTful controllers for orders
+   - CQRS configuration with validation, logging, and error handling
+   - Swagger documentation
+
+### CQRS Implementation
+
+The sample project demonstrates:
+
+1. **Command Handling**:
+   ```csharp
+   // CreateOrderCommand
+   public class CreateOrderCommand : CreateCommand<CreateOrderRequest>
+   {
+       public CreateOrderCommand(CreateOrderRequest data) : base(data)
+       {
+       }
+   }
+
+   // CreateOrderCommandHandler
+   public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
+   {
+       private readonly IOrderRepository _orderRepository;
+       private readonly IEventBus _eventBus;
+
+       public CreateOrderCommandHandler(IOrderRepository orderRepository, IEventBus eventBus)
+       {
+           _orderRepository = orderRepository;
+           _eventBus = eventBus;
+       }
+
+       public async Task<IResult> HandleAsync(CreateOrderCommand command)
+       {
+           var order = new Order(command.Data.CustomerName);
+           foreach (var item in command.Data.Items)
+           {
+               order.AddItem(item.ProductName, item.Quantity, item.UnitPrice);
+           }
+           
+           await _orderRepository.AddAsync(order);
+           
+           // Publish event
+           await _eventBus.PublishAsync(new OrderCreatedEvent(order.Id, order.CustomerName));
+           
+           return CommandResult.Success(order.Id);
+       }
+   }
+   ```
+
+2. **Query Handling**:
+   ```csharp
+   // GetOrderByIdQuery
+   public class GetOrderByIdQuery : IQuery<OrderDto?>
+   {
+       public Guid OrderId { get; }
+
+       public GetOrderByIdQuery(Guid orderId)
+       {
+           OrderId = orderId;
+       }
+   }
+
+   // GetOrderByIdQueryHandler
+   public class GetOrderByIdQueryHandler : IQueryHandler<GetOrderByIdQuery, OrderDto?>
+   {
+       private readonly IOrderRepository _orderRepository;
+
+       public GetOrderByIdQueryHandler(IOrderRepository orderRepository)
+       {
+           _orderRepository = orderRepository;
+       }
+
+       public async Task<OrderDto?> HandleAsync(GetOrderByIdQuery query)
+       {
+           var order = await _orderRepository.GetByIdAsync(query.OrderId);
+           return order == null ? null : new OrderDto(order);
+       }
+   }
+   ```
+
+3. **Validation**:
+   ```csharp
+   // CreateOrderCommandValidator
+   public class CreateOrderCommandValidator : AbstractValidator<CreateOrderCommand>
+   {
+       public CreateOrderCommandValidator()
+       {
+           RuleFor(x => x.Data.CustomerName).NotEmpty().MaximumLength(100);
+           RuleFor(x => x.Data.Items).NotEmpty().WithMessage("Order must have at least one item");
+           
+           RuleForEach(x => x.Data.Items).ChildRules(item =>
+           {
+               item.RuleFor(x => x.ProductName).NotEmpty().MaximumLength(100);
+               item.RuleFor(x => x.Quantity).GreaterThan(0);
+               item.RuleFor(x => x.UnitPrice).GreaterThan(0);
+           });
+       }
+   }
+   ```
+
+4. **Event Handling**:
+   ```csharp
+   // OrderCreatedEvent
+   public class OrderCreatedEvent : Event
+   {
+       public Guid OrderId { get; }
+       public string CustomerName { get; }
+
+       public OrderCreatedEvent(Guid orderId, string customerName)
+       {
+           OrderId = orderId;
+           CustomerName = customerName;
+       }
+   }
+
+   // OrderCreatedEventHandler
+   public class OrderCreatedEventHandler : IEventHandler<OrderCreatedEvent>
+   {
+       private readonly ILogger<OrderCreatedEventHandler> _logger;
+
+       public OrderCreatedEventHandler(ILogger<OrderCreatedEventHandler> logger)
+       {
+           _logger = logger;
+       }
+
+       public Task HandleAsync(OrderCreatedEvent @event, CancellationToken cancellationToken = default)
+       {
+           _logger.LogInformation("Order {OrderId} created for customer {CustomerName}", 
+               @event.OrderId, @event.CustomerName);
+           return Task.CompletedTask;
+       }
+   }
+   ```
+
+5. **Internal Commands with PostgreSQL**:
+   ```csharp
+   // In Program.cs
+   services.AddBwCqrs(builder =>
+   {
+       builder
+           .AddValidation()
+           .AddLogging()
+           .AddErrorHandling()
+           .AddRetry(maxRetries: 3, delayMilliseconds: 1000)
+           .AddEventHandling()
+           .AddInternalCommands(options =>
+           {
+               options.MaxRetries = 3;
+               options.RetryDelaySeconds = 60;
+               options.ProcessingIntervalSeconds = 10;
+               options.RetentionDays = 7;
+           })
+           .UsePostgres(options =>
+           {
+               options.ConnectionString = connectionString;
+           });
+   }, typeof(OrderManagementApplicationInfo).Assembly);
+   ```
+
+### Running the Sample
+
+1. Clone the repository
+2. Navigate to the OrderManagement.API directory
+3. Update the connection string in `appsettings.json`
+4. Run the application:
+   ```bash
+   dotnet run
+   ```
+5. Access the Swagger UI at `https://localhost:5001/swagger`
+
+This sample project provides a complete example of how to implement CQRS using the BitWrite CQRS Library in a real-world application.
+
 ## Contributing
 
 Contributions are welcome! Please feel free to submit a Pull Request.
@@ -462,206 +778,3 @@ Contributions are welcome! Please feel free to submit a Pull Request.
 ## License
 
 This project is licensed under the MIT License - see the [LICENSE](LICENSE) file for details.
-
-## PostgreSQL Integration
-
-### PostgreSQL Outbox Pattern Support
-The library provides built-in support for storing and processing internal commands using PostgreSQL as a reliable outbox storage.
-
-### Installation
-
-```bash
-dotnet add package Bw.Cqrs.InternalCommand.Postgres
-```
-
-### Configuration
-
-Add PostgreSQL support to your CQRS setup:
-
-```csharp
-services.AddBwCqrs(builder =>
-{
-    builder
-        .AddValidation()
-        .AddLogging()
-        .AddInternalCommands()
-        .UsePostgres(options =>
-        {
-            options.ConnectionString = "Host=localhost;Database=your_db;Username=your_user;Password=your_password";
-            options.CommandTimeout = TimeSpan.FromSeconds(30);
-            options.EnableDetailedErrors = true;
-            options.EnableSensitiveDataLogging = false;
-        });
-}, typeof(Program).Assembly);
-```
-
-### Features
-
-- 🗄️ Reliable storage of internal commands in PostgreSQL
-- 📊 Command state tracking (Scheduled, Processing, Processed, Failed, Cancelled)
-- 🔄 Automatic processing through background service
-- 📝 Error logging and handling
-- 🔍 Easy querying of command status
-- ⚡ High performance with Entity Framework Core
-- 🧪 Integration tests with Testcontainers
-- 🔒 Configurable command timeout and retry policies
-- 📈 Built-in command statistics and monitoring
-
-### Database Schema
-
-The PostgreSQL integration creates the following table:
-
-```sql
-CREATE TABLE internal_commands (
-    id UUID PRIMARY KEY,
-    type VARCHAR(500) NOT NULL,
-    data TEXT NOT NULL,
-    scheduled_on TIMESTAMP NOT NULL,
-    processed_on TIMESTAMP NULL,
-    retry_count INT NOT NULL DEFAULT 0,
-    error VARCHAR(2000) NULL,
-    status VARCHAR(50) NOT NULL,
-    created_at TIMESTAMP NOT NULL,
-    last_retry_at TIMESTAMP NULL
-);
-```
-
-### Usage Example
-
-```csharp
-// Define an internal command that needs to be processed later
-public class SendWelcomeEmailCommand : InternalCommand
-{
-    public string UserEmail { get; set; } = string.Empty;
-    public string Username { get; set; } = string.Empty;
-}
-
-// Schedule the command for later processing
-public class UserRegistrationService
-{
-    private readonly ICommandBus _commandBus;
-
-    public UserRegistrationService(ICommandBus commandBus)
-    {
-        _commandBus = commandBus;
-    }
-
-    public async Task RegisterUserAsync(string username, string email)
-    {
-        // ... register user ...
-
-        // Schedule welcome email to be sent later
-        var command = new SendWelcomeEmailCommand
-        {
-            Username = username,
-            UserEmail = email
-        };
-
-        // Command will be stored in PostgreSQL and processed by background service
-        await _commandBus.ScheduleAsync(command);
-    }
-}
-
-// Implement the command handler
-public class SendWelcomeEmailCommandHandler : ICommandHandler<SendWelcomeEmailCommand>
-{
-    private readonly IEmailService _emailService;
-
-    public SendWelcomeEmailCommandHandler(IEmailService emailService)
-    {
-        _emailService = emailService;
-    }
-
-    public async Task<IResult> HandleAsync(SendWelcomeEmailCommand command)
-    {
-        await _emailService.SendWelcomeEmailAsync(command.UserEmail, command.Username);
-        return CommandResult.Success();
-    }
-}
-```
-
-### Advanced Usage
-
-#### Custom Command Processing Retry Logic
-
-```csharp
-public class CustomInternalCommandProcessor : BackgroundService
-{
-    private readonly IInternalCommandStore _store;
-    private readonly ICommandBus _commandBus;
-    private readonly ILogger<CustomInternalCommandProcessor> _logger;
-
-    public CustomInternalCommandProcessor(
-        IInternalCommandStore store,
-        ICommandBus commandBus,
-        ILogger<CustomInternalCommandProcessor> logger)
-    {
-        _store = store;
-        _commandBus = commandBus;
-        _logger = logger;
-    }
-
-    protected override async Task ExecuteAsync(CancellationToken stoppingToken)
-    {
-        while (!stoppingToken.IsCancellationRequested)
-        {
-            try
-            {
-                var pendingCommands = await _store.GetCommandsToExecuteAsync();
-                
-                foreach (var command in pendingCommands)
-                {
-                    try
-                    {
-                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processing);
-                        await _commandBus.DispatchAsync(command);
-                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processed);
-                    }
-                    catch (Exception ex)
-                    {
-                        _logger.LogError(ex, "Failed to process command {CommandId}", command.Id);
-                        await _store.UpdateStatusAsync(command.Id, InternalCommandStatus.Failed, ex.Message);
-                        // Implement your retry logic here
-                    }
-                }
-
-                await Task.Delay(TimeSpan.FromSeconds(10), stoppingToken);
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error in command processor");
-                await Task.Delay(TimeSpan.FromSeconds(30), stoppingToken);
-            }
-        }
-    }
-}
-```
-
-#### Monitoring Command Status
-
-```csharp
-public class CommandMonitoringService
-{
-    private readonly IInternalCommandStore _store;
-
-    public CommandMonitoringService(IInternalCommandStore store)
-    {
-        _store = store;
-    }
-
-    public async Task<InternalCommandStats> GetCommandStatsAsync()
-    {
-        return await _store.GetStatsAsync();
-    }
-}
-```
-
-### Best Practices
-
-1. **Command Idempotency**: Ensure your command handlers are idempotent as commands might be processed multiple times.
-2. **Error Handling**: Always implement proper error handling in your command handlers.
-3. **Monitoring**: Set up monitoring for failed commands and processing delays.
-4. **Database Maintenance**: Implement a cleanup strategy for processed commands.
-5. **Performance**: Index the `status` and `scheduled_on` columns for better query performance.
-6. **Configuration**: Use appropriate timeouts and retry policies based on your application needs.
-7. **Testing**: Write both unit tests and integration tests for your command handlers and storage implementation.
