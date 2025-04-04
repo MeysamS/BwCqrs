@@ -4,11 +4,19 @@ using Microsoft.Extensions.Logging;
 
 namespace Bw.Cqrs.Events.Services;
 
+/// <summary>
+/// In-memory implementation of the event bus that dispatches events to registered handlers
+/// </summary>
 public class InMemoryEventBus : IEventBus
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<InMemoryEventBus> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the InMemoryEventBus
+    /// </summary>
+    /// <param name="serviceProvider">The service provider for resolving event handlers</param>
+    /// <param name="logger">The logger instance</param>
     public InMemoryEventBus(
         IServiceProvider serviceProvider,
         ILogger<InMemoryEventBus> logger)
@@ -17,6 +25,7 @@ public class InMemoryEventBus : IEventBus
         _logger = logger;
     }
 
+    /// <inheritdoc />
     public async Task PublishAsync<TEvent>(TEvent @event, CancellationToken cancellationToken = default) 
         where TEvent : IEvent
     {
@@ -48,6 +57,7 @@ public class InMemoryEventBus : IEventBus
         }
     }
 
+    /// <inheritdoc />
     public async Task PublishAsync(IEvent[] events, CancellationToken cancellationToken = default)
     {
         foreach (var @event in events)
