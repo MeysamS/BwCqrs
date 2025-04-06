@@ -10,6 +10,7 @@ A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Seg
 - ✅ Built-in validation using FluentValidation
 - 📝 Comprehensive logging support
 - 🔄 Delayed command processing (Outbox pattern)
+- 💼 Transactional support with deadlock retry
 - 🎯 Command result handling
 - 🏭 Dependency injection support
 - 🔁 Retry mechanism with configurable policies
@@ -500,6 +501,93 @@ If you encounter any issues:
 3. Ensure all required indexes are created
 4. Check the application logs for any error messages
 5. If you see errors like `column i.Id does not exist`, make sure your column names match exactly with the ones in the SQL script (including casing and quotes)
+
+## Transaction Support
+
+The library provides built-in transaction support for commands with the following features:
+- Configurable isolation levels
+- Transaction timeout settings
+- Automatic deadlock detection and retry
+- Support for existing transactions
+- Comprehensive logging
+
+#### Configuration
+
+Add transaction support to your CQRS setup:
+
+```csharp
+services.AddBwCqrs(builder =>
+{
+    builder
+        .AddValidation()
+        .AddLogging()
+        .AddErrorHandling()
+        .AddTransactionSupport(options =>
+        {
+            // Configure isolation level (default is ReadCommitted)
+            options.IsolationLevel = IsolationLevel.ReadCommitted;
+            
+            // Set transaction timeout in seconds (default is 30, 0 for no timeout)
+            options.TimeoutSeconds = 30;
+            
+            // Enable/disable deadlock retry (default is true)
+            options.RetryOnDeadlock = true;
+            
+            // Configure deadlock retry attempts (default is 3)
+            options.MaxDeadlockRetries = 3;
+            
+            // Set delay between retry attempts in milliseconds (default is 100)
+            options.DeadlockRetryDelayMs = 100;
+        });
+}, typeof(Program).Assembly);
+```
+
+#### Usage Example
+
+```csharp
+public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
+{
+    private readonly IOrderRepository _orderRepository;
+    private readonly IEventBus _eventBus;
+
+    public CreateOrderCommandHandler(
+        IOrderRepository orderRepository,
+        IEventBus eventBus)
+    {
+        _orderRepository = orderRepository;
+        _eventBus = eventBus;
+    }
+
+    public async Task<IResult> HandleAsync(CreateOrderCommand command)
+    {
+        // Transaction is automatically handled by the TransactionBehavior
+        // If any operation fails, all changes will be rolled back
+        
+        var order = new Order(command.Data.CustomerName);
+        await _orderRepository.AddAsync(order);
+        
+        foreach (var item in command.Data.Items)
+        {
+            order.AddItem(item.ProductName, item.Quantity, item.UnitPrice);
+            await _orderRepository.UpdateAsync(order);
+        }
+        
+        // Event will only be published if transaction succeeds
+        await _eventBus.PublishAsync(new OrderCreatedEvent(order.Id));
+        
+        return CommandResult.Success();
+    }
+}
+```
+
+#### Important Notes
+
+1. Transactions are automatically handled for all commands
+2. If a command returns failure result, the transaction is automatically rolled back
+3. Deadlock detection and retry is enabled by default
+4. All database operations within the command handler are included in the transaction
+5. Events are published only if the transaction succeeds
+6. Existing transactions are respected and reused if present
 
 ## Best Practices
 
