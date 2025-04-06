@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using Bw.Cqrs.Command.Contract;
 using Bw.Cqrs.Commands.Pipeline.Behaviors;
 using Bw.Cqrs.Commands.Services;
@@ -9,6 +9,8 @@ using Bw.Cqrs.Events.Contracts;
 using Bw.Cqrs.Events.Services;
 using Bw.Cqrs.Commands.Configuration;
 using Bw.Cqrs.Commands.Contracts;
+using Microsoft.Extensions.Options;
+using System.Data;
 
 namespace Bw.Cqrs.Extensions;
 
@@ -66,6 +68,35 @@ public static class ServiceCollectionExtensions
     public static ICqrsBuilder AddLogging(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped(typeof(LoggingBehavior<,>));
+        return builder;
+    }
+
+    /// <summary>
+    /// Adds transaction support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <param name="configureOptions">Optional action to configure transaction options</param>
+    /// <returns>The CQRS builder for method chaining</returns>
+    public static ICqrsBuilder AddTransactionSupport(
+        this ICqrsBuilder builder,
+        Action<TransactionOptions>? configureOptions = null)
+    {
+        ArgumentNullException.ThrowIfNull(builder, nameof(builder));
+
+        // Configure transaction options
+        if (configureOptions != null)
+        {
+            builder.Services.Configure(configureOptions);
+        }
+        else
+        {
+            builder.Services.Configure<TransactionOptions>(options => { });
+        }
+
+        // Register both versions of the transaction behavior
+        builder.Services.AddScoped(typeof(TransactionBehavior<,>));
+        builder.Services.AddScoped(typeof(TransactionBehavior<>));
+
         return builder;
     }
 
