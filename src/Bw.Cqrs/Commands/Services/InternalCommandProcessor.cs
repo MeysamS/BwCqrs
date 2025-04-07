@@ -1,8 +1,8 @@
-using Bw.Cqrs.Command.Contract;
 using Bw.Cqrs.Commands.Base;
 using Bw.Cqrs.Commands.Configuration;
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Commands.Enums;
+
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;

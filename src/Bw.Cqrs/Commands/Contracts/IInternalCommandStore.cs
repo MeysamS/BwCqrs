@@ -1,4 +1,3 @@
-
 using Bw.Cqrs.Commands.Enums;
 using Bw.Cqrs.Commands.Models;
 

@@ -1,6 +1,6 @@
-using Bw.Cqrs.Command.Contract;
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Common.Results;
+
 using Microsoft.Extensions.Logging;
 
 namespace Bw.Cqrs.Commands.Pipeline.Behaviors;

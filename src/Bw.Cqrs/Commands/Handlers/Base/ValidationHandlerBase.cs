@@ -1,5 +1,4 @@
 using Bw.Cqrs.Command;
-using Bw.Cqrs.Command.Contract;
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Common.Results;
 

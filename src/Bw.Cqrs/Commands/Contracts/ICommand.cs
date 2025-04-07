@@ -1,4 +1,4 @@
-﻿namespace Bw.Cqrs.Command.Contract;
+﻿namespace Bw.Cqrs.Commands.Contracts;
 
 public interface ICommand
 {

@@ -1,4 +1,5 @@
-﻿using Bw.Cqrs.Common.Results;
+﻿using Bw.Cqrs.Commands.Contracts;
+using Bw.Cqrs.Common.Results;
 
 namespace Bw.Cqrs.Command.Contract;
 

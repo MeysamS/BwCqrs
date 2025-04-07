@@ -1,4 +1,3 @@
-using Bw.Cqrs.Command.Contract;
 using Bw.Cqrs.Commands.Enums;
 
 namespace Bw.Cqrs.Commands.Contracts;
