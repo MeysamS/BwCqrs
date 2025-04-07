@@ -2,6 +2,7 @@
 using Bw.Cqrs.Common.Results;
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.DependencyInjection;
+using Bw.Cqrs.Commands.Contracts;
 
 namespace Bw.Cqrs.Commands.Services;
 

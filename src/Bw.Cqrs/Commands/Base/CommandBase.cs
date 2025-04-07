@@ -1,4 +1,4 @@
-using Bw.Cqrs.Command.Contract;
+using Bw.Cqrs.Commands.Contracts;
 
 namespace Bw.Cqrs.Commands.Base;
 

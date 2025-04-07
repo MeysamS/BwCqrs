@@ -1,6 +1,6 @@
 using Bw.Cqrs.Commands.Results;
 
-namespace Bw.Cqrs.Command.Contract;
+namespace Bw.Cqrs.Commands.Contracts;
 
 public interface IAsyncValidationHandler<in T>
 {

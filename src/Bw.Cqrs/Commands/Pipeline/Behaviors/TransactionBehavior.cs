@@ -1,9 +1,10 @@
 using System.Data;
 using System.Data.Common;
 using System.Transactions;
-using Bw.Cqrs.Command.Contract;
+
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Common.Results;
+
 using Microsoft.Extensions.Logging;
 using Microsoft.Extensions.Options;
 

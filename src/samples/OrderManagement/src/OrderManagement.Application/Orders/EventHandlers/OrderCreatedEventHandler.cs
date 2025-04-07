@@ -1,6 +1,8 @@
-using Bw.Cqrs.Command.Contract;
+using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Events.Contracts;
+
 using Microsoft.Extensions.Logging;
+
 using OrderManagement.Application.Orders.InternalCommands;
 using OrderManagement.Domain.Events;
 using OrderManagement.Domain.Repositories;

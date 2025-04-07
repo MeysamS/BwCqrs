@@ -1,8 +1,11 @@
 using System;
 using System.Threading.Tasks;
-using Bw.Cqrs.Command.Contract;
+
 using Bw.Cqrs.Commands;
+using Bw.Cqrs.Commands.Contracts;
+
 using Microsoft.AspNetCore.Mvc;
+
 using OrderManagement.Application.Orders.Commands.CreateOrder;
 using OrderManagement.Application.Orders.Commands.UpdateOrderStatus;
 

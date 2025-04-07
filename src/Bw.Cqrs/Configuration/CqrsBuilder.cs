@@ -1,8 +1,9 @@
 using System.Reflection;
-using Bw.Cqrs.Command.Contract;
+
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Commands.Pipeline.Behaviors;
 using Bw.Cqrs.Common.Results;
+
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Bw.Cqrs.Configuration;
