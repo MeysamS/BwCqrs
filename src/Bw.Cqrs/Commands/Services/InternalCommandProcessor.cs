@@ -15,12 +15,17 @@ namespace Bw.Cqrs.Commands.Services;
 /// </summary>
 public class InternalCommandProcessor : BackgroundService
 {
-    private readonly IInternalCommandStore? _store;
-    private readonly ICommandBus? _commandBus;
+    // private readonly IInternalCommandStore? _store;
+    // private readonly ICommandBus? _commandBus;
     private readonly ILogger<InternalCommandProcessor> _logger;
     private readonly InternalCommandOptions _options;
     private readonly IServiceProvider _serviceProvider;
-
+    /// <summary>
+    /// Initializes a new instance of the InternalCommandProcessor class    
+    /// </summary>
+    /// <param name="serviceProvider">The service provider</param>
+    /// <param name="options">The internal command options</param>
+    /// <param name="logger">The logger</param>
     public InternalCommandProcessor(
         IServiceProvider serviceProvider,
         IOptions<InternalCommandOptions> options,
@@ -30,7 +35,11 @@ public class InternalCommandProcessor : BackgroundService
         _options = options.Value;
         _logger = logger;
     }
-
+    /// <summary>
+    /// Executes the internal command processor background service 
+    /// </summary>
+    /// <param name="stoppingToken">The cancellation token</param>
+    /// <returns>A task that represents the asynchronous operation</returns>
     protected override async Task ExecuteAsync(CancellationToken stoppingToken)
     {
         _logger.LogInformation("Internal Command Processor started");

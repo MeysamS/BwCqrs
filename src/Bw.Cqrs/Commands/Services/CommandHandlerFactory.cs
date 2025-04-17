@@ -14,6 +14,11 @@ public class CommandHandlerFactory : ICommandHandlerFactory
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<CommandHandlerFactory> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the CommandHandlerFactory
+    /// </summary>
+    /// <param name="serviceProvider">The service provider</param>
+    /// <param name="logger">The logger instance</param>
     public CommandHandlerFactory(
         IServiceProvider serviceProvider,
         ILogger<CommandHandlerFactory> logger)

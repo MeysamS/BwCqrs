@@ -14,13 +14,27 @@ public abstract class CommandHandlerBase<TCommand, TResult> : ICommandHandler<TC
     where TCommand : ICommand
     where TResult : IResult
 {
+    /// <summary>
+    /// Logger instance
+    /// </summary>
     protected readonly ILogger<CommandHandlerBase<TCommand, TResult>> Logger;
 
+    /// <summary>
+    /// Initializes a new instance of the <see cref="CommandHandlerBase{TCommand, TResult}"/> class.
+    /// </summary>
+    /// <param name="logger">The logger instance.</param>
+    /// <exception cref="ArgumentNullException">Thrown when <paramref name="logger"/> is null.</exception>
     protected CommandHandlerBase(ILogger<CommandHandlerBase<TCommand, TResult>> logger)
     {
         Logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
+    /// <summary>
+    /// Handles the specified command asynchronously.
+    /// </summary>
+    /// <param name="command">The command to handle.</param>
+    /// <param name="cancellationToken">The cancellation token to cancel the operation (optional).</param>
+    /// <returns>A task representing the asynchronous operation, containing the result of the command handling.</returns>
     public virtual async Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken = default)
     {
         try
@@ -63,8 +77,12 @@ public abstract class CommandHandlerBase<TCommand, TResult> : ICommandHandler<TC
 public abstract class CommandHandlerBase<TCommand> : CommandHandlerBase<TCommand, IResult>, ICommandHandler<TCommand>
     where TCommand : ICommand
 {
-    protected CommandHandlerBase(ILogger<CommandHandlerBase<TCommand>> logger) 
+    /// <summary>
+    ///     Initializes a new instance of the <see cref="CommandHandlerBase{TCommand}"/> class.
+    /// </summary>
+    /// <param name="logger"></param>
+    protected CommandHandlerBase(ILogger<CommandHandlerBase<TCommand>> logger)
         : base(logger)
     {
     }
-} 
+}

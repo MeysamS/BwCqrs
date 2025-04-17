@@ -5,6 +5,11 @@ using Microsoft.Extensions.Logging;
 
 namespace Bw.Cqrs.Commands.Pipeline.Behaviors;
 
+/// <summary>
+/// Represents a retry behavior
+/// </summary>
+/// <typeparam name="TCommand">The type of command</typeparam>
+/// <typeparam name="TResult">The type of result</typeparam>
 public class RetryBehavior<TCommand, TResult> : ICommandPipelineBehavior<TCommand, TResult>
     where TCommand : ICommand
     where TResult : IResult
@@ -13,6 +18,12 @@ public class RetryBehavior<TCommand, TResult> : ICommandPipelineBehavior<TComman
     private readonly int _maxRetries;
     private readonly TimeSpan _delay;
 
+    /// <summary>
+    /// Initializes a new instance of the RetryBehavior class
+    /// </summary>
+    /// <param name="logger">The logger</param>
+    /// <param name="maxRetries">The maximum number of retries</param>
+    /// <param name="delayMilliseconds">The delay in milliseconds</param>       
     public RetryBehavior(
         ILogger<RetryBehavior<TCommand, TResult>> logger,
         int maxRetries = 3,
@@ -23,10 +34,16 @@ public class RetryBehavior<TCommand, TResult> : ICommandPipelineBehavior<TComman
         _delay = TimeSpan.FromMilliseconds(delayMilliseconds);
     }
 
+    /// <summary>
+    /// Handles a command
+    /// </summary>
+    /// <param name="command">The command</param>
+    /// <param name="cancellationToken">Cancellation token</param>
+    /// <param name="next">The next handler in the pipeline</param>
+    /// <returns>The result of the command</returns>
     public async Task<TResult> HandleAsync(
         TCommand command,
-        CancellationToken cancellationToken,
-        CommandHandlerDelegate<TResult> next)
+        CancellationToken cancellationToken, CommandHandlerDelegate<TResult> next)
     {
         for (int i = 0; i <= _maxRetries; i++)
         {
@@ -59,9 +76,16 @@ public class RetryBehavior<TCommand, TResult> : ICommandPipelineBehavior<TComman
     }
 }
 
+/// <summary>
+/// Represents an exception thrown when a command retry is needed
+/// </summary>
 public class CommandRetryException : Exception
 {
+    /// <summary>
+    /// Initializes a new instance of the CommandRetryException class
+    /// </summary>
+    /// <param name="message">The message</param>
     public CommandRetryException(string message) : base(message)
     {
     }
-} 
+}

@@ -13,6 +13,11 @@ public class InternalCommandStorageBuilder
     private readonly IServiceCollection _services;
     private readonly ICqrsBuilder _builder;
 
+    /// <summary>
+    /// Initializes a new instance of the InternalCommandStorageBuilder class
+    /// </summary>
+    /// <param name="services">The service collection</param>
+    /// <param name="builder">The CQRS builder</param>
     public InternalCommandStorageBuilder(IServiceCollection services, ICqrsBuilder builder)
     {
         _services = services;

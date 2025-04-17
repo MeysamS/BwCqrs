@@ -4,26 +4,29 @@ using Bw.Cqrs.Common.Results;
 namespace Bw.Cqrs.Commands.Pipeline.Behaviors;
 
 /// <summary>
-/// Middleware for handling command validation using multiple validators
+/// Provides validation behavior for command execution pipeline
 /// </summary>
-/// <typeparam name="TCommand">Type of command to validate</typeparam>
+/// <typeparam name="TCommand">Type of command</typeparam>
 public class ValidationBehavior<TCommand> : ICommandPipelineBehavior<TCommand, IResult>
     where TCommand : ICommand
 {
-    private readonly IValidationHandler<TCommand> _validationHandler;
+    private readonly IValidationHandler<TCommand> _validator;
 
-    public ValidationBehavior(IValidationHandler<TCommand> validationHandler)
+    /// <summary>
+    /// Initializes a new instance of the validation behavior
+    /// </summary>
+    /// <param name="validator">Validation handler</param>
+    public ValidationBehavior(IValidationHandler<TCommand> validator)
     {
-        _validationHandler = validationHandler ?? throw new ArgumentNullException(nameof(validationHandler));
+        _validator = validator;
     }
 
-    public async Task<IResult> HandleAsync(
-        TCommand command,
-        CancellationToken cancellationToken,
-        CommandHandlerDelegate<IResult> next)
+    /// <summary>
+    /// Handles the command execution with validation
+    /// </summary>
+    public async Task<IResult> HandleAsync(TCommand command, CancellationToken cancellationToken, CommandHandlerDelegate<IResult> next)
     {
-        var validationResult = await _validationHandler.ValidateAsync(command, cancellationToken);
-        
+        var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsSuccess)
         {
             return validationResult;
@@ -33,37 +36,49 @@ public class ValidationBehavior<TCommand> : ICommandPipelineBehavior<TCommand, I
     }
 }
 
+/// <summary>
+/// Provides validation behavior for command execution pipeline with specific result type
+/// </summary>
 public class ValidationBehavior<TCommand, TResult> : ICommandPipelineBehavior<TCommand, TResult>
     where TCommand : ICommand
-    where TResult : class, IResult
+    where TResult : IResult
 {
-    private readonly IValidationHandler<TCommand> _validationHandler;
+    private readonly IValidationHandler<TCommand> _validator;
 
-    public ValidationBehavior(IValidationHandler<TCommand> validationHandler)
+    /// <summary>
+    /// Initializes a new instance of the validation behavior
+    /// </summary>
+    /// <param name="validator">Validation handler</param>
+    public ValidationBehavior(IValidationHandler<TCommand> validator)
     {
-        _validationHandler = validationHandler ?? throw new ArgumentNullException(nameof(validationHandler));
+        _validator = validator;
     }
 
-    public async Task<TResult> HandleAsync(
-        TCommand command,
-        CancellationToken cancellationToken,
-        CommandHandlerDelegate<TResult> next)
+    /// <summary>
+    /// Handles the command execution with validation
+    /// </summary>
+    public async Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken, CommandHandlerDelegate<TResult> next)
     {
-        var validationResult = await _validationHandler.ValidateAsync(command, cancellationToken);
-        
+        var validationResult = await _validator.ValidateAsync(command, cancellationToken);
         if (!validationResult.IsSuccess)
         {
-            throw new ValidationException(validationResult.ErrorMessage ?? "Validation failed");
+            throw new ValidationException(validationResult.ErrorMessage);
         }
 
         return await next();
     }
 }
 
+/// <summary>
+/// Exception thrown when validation fails
+/// </summary>
 public class ValidationException : Exception
 {
-    public ValidationException(string? error) 
-        : base($"Validation failed: {error ?? "No error message provided"}")
+    /// <summary>
+    /// Initializes a new instance of the validation exception
+    /// </summary>
+    /// <param name="message">Error message</param>
+    public ValidationException(string? message) : base(message)
     {
     }
 } 

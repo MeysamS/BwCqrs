@@ -9,8 +9,17 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Bw.Cqrs.InternalCommands.Postgres.Extensions;
 
+/// <summary>
+/// Extensions for configuring the Postgres storage
+/// </summary>
 public static class PostgresStorageExtensions
 {
+    /// <summary>
+    /// Adds the Postgres storage to the CQRS builder
+    /// </summary>
+    /// <param name="builder"></param>
+    /// <param name="configure"></param>
+    /// <returns></returns>
     public static ICqrsBuilder UsePostgres(
         this InternalCommandStorageBuilder builder,
         Action<PostgresOptions> configure)
@@ -35,6 +44,12 @@ public static class PostgresStorageExtensions
         return builder.Builder;
     }
 
+    /// <summary>
+    /// Adds the Postgres storage to the CQRS builder
+    /// </summary>
+    /// <param name="builder"></param>
+    /// <param name="options"></param>
+    /// <returns></returns>
     public static DbContextOptionsBuilder UsePostgres(
         this DbContextOptionsBuilder builder,
         PostgresOptions options)
@@ -47,4 +62,4 @@ public static class PostgresStorageExtensions
                 npgsqlOptions.CommandTimeout((int)options.CommandTimeout.TotalSeconds);
             });
     }
-} 
+}

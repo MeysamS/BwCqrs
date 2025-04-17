@@ -13,10 +13,15 @@ public abstract class CreateCommand<TRequest, TResponse> : CommandBase
     where TResponse : IResult
 {
     /// <summary>
-    /// Data for creating the entity
+    /// Gets the data for creating the entity
     /// </summary>
     public TRequest Data { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the create command
+    /// </summary>
+    /// <param name="data">Data for creating the entity</param>
+    /// <exception cref="ArgumentNullException">Thrown when data is null</exception>
     protected CreateCommand(TRequest data)
     {
         Data = data ?? throw new ArgumentNullException(nameof(data));
@@ -30,6 +35,10 @@ public abstract class CreateCommand<TRequest, TResponse> : CommandBase
 public abstract class CreateCommand<TRequest> : CreateCommand<TRequest, IResult>
     where TRequest : class
 {
+    /// <summary>
+    /// Initializes a new instance of the create command
+    /// </summary>
+    /// <param name="data">Data for creating the entity</param>
     protected CreateCommand(TRequest data) : base(data)
     {
     }
