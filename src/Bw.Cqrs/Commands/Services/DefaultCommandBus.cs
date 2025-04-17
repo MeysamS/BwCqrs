@@ -5,6 +5,9 @@ using Microsoft.Extensions.DependencyInjection;
 
 namespace Bw.Cqrs.Commands.Services;
 
+/// <summary>
+/// Represents the default command bus
+/// </summary>
 public class DefaultCommandBus : ICommandBus
 {
     private readonly ICommandHandlerFactory _commandHandlerFactory;
@@ -12,6 +15,12 @@ public class DefaultCommandBus : ICommandBus
 
     private readonly IServiceProvider _serviceProvider;
 
+    /// <summary>
+    /// Initializes a new instance of the DefaultCommandBus class
+    /// </summary>
+    /// <param name="commandHandlerFactory">The command handler factory</param>
+    /// <param name="internalCommandStore">The internal command store</param>
+    /// <param name="serviceProvider">The service provider</param>
     public DefaultCommandBus(
         ICommandHandlerFactory commandHandlerFactory,
         IInternalCommandStore internalCommandStore,
@@ -22,6 +31,12 @@ public class DefaultCommandBus : ICommandBus
         _serviceProvider = serviceProvider ?? throw new ArgumentNullException(nameof(serviceProvider));
     }
 
+    /// <summary>
+    /// Dispatches a command
+    /// </summary>
+    /// <typeparam name="TCommand">The type of command</typeparam>
+    /// <param name="command">The command</param>
+    /// <returns>A task</returns>
     public async Task DispatchAsync<TCommand>(TCommand command)
         where TCommand : ICommand
     {
@@ -40,6 +55,13 @@ public class DefaultCommandBus : ICommandBus
         await pipeline();
     }
 
+    /// <summary>
+    /// Dispatches a command and returns a result
+    /// </summary>
+    /// <typeparam name="TCommand">The type of command</typeparam>
+    /// <typeparam name="TResult">The type of result</typeparam>
+    /// <param name="command">The command</param>
+    /// <returns>The result</returns>
     public async Task<TResult?> DispatchAsync<TCommand, TResult>(TCommand command)
         where TCommand : ICommand
         where TResult : class, IResult
@@ -59,6 +81,11 @@ public class DefaultCommandBus : ICommandBus
         return await pipeline();
     }
 
+    /// <summary>
+    /// Dispatches a command
+    /// </summary>
+    /// <typeparam name="TCommand">The type of command</typeparam>
+    /// <param name="command">The command</param>   
     public void Dispatch<TCommand>(TCommand command)
         where TCommand : ICommand
     {
@@ -66,7 +93,12 @@ public class DefaultCommandBus : ICommandBus
     }
 
 
-
+    /// <summary>
+    /// Schedules a command to be processed asynchronously.
+    /// </summary>
+    /// <typeparam name="TCommand"></typeparam>
+    /// <param name="command"></param>
+    /// <returns></returns>
     public async Task ScheduleAsync<TCommand>(TCommand command)
     where TCommand : IInternalCommand
     {

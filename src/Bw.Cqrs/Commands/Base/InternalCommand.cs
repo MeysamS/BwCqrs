@@ -26,6 +26,10 @@ public abstract class InternalCommand : CommandBase, IInternalCommand
     /// <inheritdoc />
     public InternalCommandStatus Status { get; private set; }
 
+    /// <summary>
+    /// Initializes a new instance of the InternalCommand class
+    /// </summary>
+    /// <param name="executeAt">The date and time to execute the command</param> 
     protected InternalCommand(DateTime? executeAt = null)
     {
         ScheduledOn = DateTime.UtcNow;

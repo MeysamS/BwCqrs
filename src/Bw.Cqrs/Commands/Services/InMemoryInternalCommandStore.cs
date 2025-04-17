@@ -15,11 +15,21 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
     private readonly ConcurrentDictionary<Guid, IInternalCommand> _commands = new();
     private readonly ILogger<InMemoryInternalCommandStore> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the InMemoryInternalCommandStore class
+    /// </summary>
+    /// <param name="logger">The logger</param>
     public InMemoryInternalCommandStore(ILogger<InMemoryInternalCommandStore> logger)
     {
         _logger = logger;
     }
 
+    /// <summary>
+    /// Saves a command
+    /// </summary>
+    /// <param name="command">The command</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task</returns>
     public Task SaveAsync(IInternalCommand command, CancellationToken cancellationToken = default)
     {
         if (_commands.TryAdd(((CommandBase)command).Id, command))
@@ -31,6 +41,11 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
         throw new InvalidOperationException($"Command with ID {((CommandBase)command).Id} already exists");
     }
 
+    /// <summary>
+    /// Gets commands to execute
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task</returns>
     public Task<IEnumerable<IInternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
     {
         var commands = _commands.Values
@@ -41,6 +56,13 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
         return Task.FromResult<IEnumerable<IInternalCommand>>(commands);
     }
 
+    /// <summary>
+    /// Updates the status of a command
+    /// </summary>
+    /// <param name="commandId">The command ID</param>
+    /// <param name="status">The status</param>
+    /// <param name="error">The error</param>
+    /// <param name="cancellationToken">The cancellation token</param>
     public Task UpdateStatusAsync(Guid commandId, InternalCommandStatus status, string? error = null, CancellationToken cancellationToken = default)
     {
         if (_commands.TryGetValue(commandId, out var command) && command is InternalCommand ic)
@@ -68,6 +90,12 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
         throw new InvalidOperationException($"Command with ID {commandId} not found");
     }
 
+    /// <summary>
+    /// Cleans up old commands
+    /// </summary>
+    /// <param name="cutoffDate">The cutoff date</param>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task</returns>
     public Task CleanupAsync(DateTime cutoffDate, CancellationToken cancellationToken = default)
     {
         var oldCommands = _commands.Values
@@ -84,6 +112,11 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
         return Task.CompletedTask;
     }
 
+    /// <summary>
+    /// Gets the stats of the internal command store
+    /// </summary>
+    /// <param name="cancellationToken">The cancellation token</param>
+    /// <returns>A task</returns>
     public Task<InternalCommandStats> GetStatsAsync(CancellationToken cancellationToken = default)
     {
         var stats = new InternalCommandStats
@@ -98,5 +131,5 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
 
         return Task.FromResult(stats);
     }
-
+    
 } 

@@ -17,15 +17,19 @@ public class LoggingBehavior<TCommand, TResult> : ICommandPipelineBehavior<TComm
 {
     private readonly ILogger<LoggingBehavior<TCommand, TResult>> _logger;
 
+    /// <summary>
+    /// Initializes a new instance of the logging behavior
+    /// </summary>
+    /// <param name="logger">Logger instance</param>
     public LoggingBehavior(ILogger<LoggingBehavior<TCommand, TResult>> logger)
     {
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
     }
 
-    public async Task<TResult> HandleAsync(
-        TCommand command,
-        CancellationToken cancellationToken,
-        CommandHandlerDelegate<TResult> next)
+    /// <summary>
+    /// Handles the command execution with logging
+    /// </summary>
+    public async Task<TResult> HandleAsync(TCommand command, CancellationToken cancellationToken, CommandHandlerDelegate<TResult> next)
     {
         var commandType = command.GetType().Name;
         var commandId = command.Id;
@@ -68,6 +72,9 @@ public class LoggingBehavior<TCommand, TResult> : ICommandPipelineBehavior<TComm
 public class LoggingBehavior<TCommand> : LoggingBehavior<TCommand, IResult>, ICommandPipelineBehavior<TCommand>
     where TCommand : CommandBase
 {
+    /// <summary>
+    /// Initializes a new instance of the logging behavior
+    /// </summary>
     public LoggingBehavior(ILogger<LoggingBehavior<TCommand, IResult>> logger) 
         : base(logger)
     {

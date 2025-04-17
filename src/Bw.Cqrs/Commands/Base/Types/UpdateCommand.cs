@@ -13,15 +13,22 @@ public abstract class UpdateCommand<TRequest, TResponse> : CommandBase
     where TResponse : IResult
 {
     /// <summary>
-    /// ID of the entity to update
+    /// Gets the ID of the entity to update
     /// </summary>
     public Guid EntityId { get; }
 
     /// <summary>
-    /// Data for updating the entity
+    /// Gets the data for updating the entity
     /// </summary>
     public TRequest Data { get; }
 
+    /// <summary>
+    /// Initializes a new instance of the update command
+    /// </summary>
+    /// <param name="entityId">ID of the entity to update</param>
+    /// <param name="data">Data for updating the entity</param>
+    /// <exception cref="ArgumentException">Thrown when entityId is empty</exception>
+    /// <exception cref="ArgumentNullException">Thrown when data is null</exception>
     protected UpdateCommand(Guid entityId, TRequest data)
     {
         if (entityId == Guid.Empty)
@@ -39,6 +46,11 @@ public abstract class UpdateCommand<TRequest, TResponse> : CommandBase
 public abstract class UpdateCommand<TRequest> : UpdateCommand<TRequest, IResult>
     where TRequest : class
 {
+    /// <summary>
+    /// Initializes a new instance of the update command
+    /// </summary>
+    /// <param name="entityId">ID of the entity to update</param>
+    /// <param name="data">Data for updating the entity</param>
     protected UpdateCommand(Guid entityId, TRequest data) : base(entityId, data)
     {
     }

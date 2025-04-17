@@ -14,12 +14,17 @@ using System.Data;
 
 namespace Bw.Cqrs.Extensions;
 
+/// <summary>
+/// Extension methods for the IServiceCollection interface
+/// </summary>
 public static class ServiceCollectionExtensions
 {
     /// <summary>
     /// Adds event handling support to the CQRS builder
     /// </summary>
-    /// <param name="builder">The CQRS builder instance</param>
+    /// <param name="services">The service collection</param>
+    /// <param name="configure">The configuration action</param>
+    /// <param name="assemblies">The assemblies to scan</param>
     /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddBwCqrs(this IServiceCollection services, Action<ICqrsBuilder> configure, params Assembly[] assemblies)
     {
@@ -42,12 +47,23 @@ public static class ServiceCollectionExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Adds error handling support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddErrorHandling(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped(typeof(ErrorHandlingBehavior<,>));
         return builder;
     }
 
+    /// <summary>
+    /// Adds retry support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <param name="maxRetries">The maximum number of retries</param>
+    /// <param name="delayMilliseconds">The delay in milliseconds between retries</param>
     public static ICqrsBuilder AddRetry(this ICqrsBuilder builder, int maxRetries = 3, int delayMilliseconds = 1000)
     {
         builder.Services.AddScoped(typeof(RetryBehavior<,>));
@@ -59,12 +75,22 @@ public static class ServiceCollectionExtensions
         return builder;
     }
 
+    /// <summary>
+    /// Adds validation support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddValidation(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped(typeof(ValidationBehavior<,>));
         return builder;
     }
 
+    /// <summary>
+    /// Adds logging support to the CQRS builder
+    /// </summary>
+    /// <param name="builder">The CQRS builder instance</param>
+    /// <returns>The CQRS builder for method chaining</returns> 
     public static ICqrsBuilder AddLogging(this ICqrsBuilder builder)
     {
         builder.Services.AddScoped(typeof(LoggingBehavior<,>));
@@ -144,8 +170,17 @@ public static class ServiceCollectionExtensions
     }
 }
 
+/// <summary>
+/// Extension methods for the IServiceTypeSelector interface
+/// </summary>
 public static class ServiceTypeSelectorExtensions
 {
+    /// <summary>
+    /// Adds a service type selector that matches closed generic types
+    /// </summary>
+    /// <param name="selector">The service type selector</param>
+    /// <param name="closeType">The closed type to match</param>
+    /// <returns>The service type selector for method chaining</returns>
     public static ILifetimeSelector AsClosedTypeOf(this IServiceTypeSelector selector, Type closeType)
     {
         return _ = selector.As(t =>
