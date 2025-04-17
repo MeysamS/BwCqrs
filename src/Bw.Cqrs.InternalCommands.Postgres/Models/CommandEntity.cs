@@ -3,6 +3,9 @@ using Bw.Cqrs.Commands.Enums;
 
 namespace Bw.Cqrs.InternalCommands.Postgres.Models;
 
+/// <summary>
+/// Represents a command entity.
+/// </summary>
 public class CommandEntity
 {
     [Key]

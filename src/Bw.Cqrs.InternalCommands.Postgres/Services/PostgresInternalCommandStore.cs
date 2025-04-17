@@ -10,11 +10,18 @@ using Microsoft.Extensions.Logging;
 
 namespace Bw.Cqrs.InternalCommands.Postgres.Services;
 
+/// <summary>
+/// store manage internal commands to postgres database
+/// </summary>
 public class PostgresInternalCommandStore : IInternalCommandStore
 {
     private readonly CommandDbContext _dbContext;
     private readonly ILogger<PostgresInternalCommandStore> _logger;
-
+    /// <summary>
+    /// 
+    /// </summary>
+    /// <param name="dbContext"></param>
+    /// <param name="logger"></param>
     public PostgresInternalCommandStore(
         CommandDbContext dbContext,
         ILogger<PostgresInternalCommandStore> logger)
@@ -23,6 +30,12 @@ public class PostgresInternalCommandStore : IInternalCommandStore
         _logger = logger;
     }
 
+    /// <summary>
+    /// save internal command to postgres database
+    /// </summary>
+    /// <param name="command"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task SaveAsync(IInternalCommand command, CancellationToken cancellationToken = default)
     {
         var entity = new CommandEntity
@@ -40,7 +53,11 @@ public class PostgresInternalCommandStore : IInternalCommandStore
 
         _logger.LogDebug("Command {CommandId} saved to PostgreSQL", entity.Id);
     }
-
+    /// <summary>
+    /// get commands to execute from postgres database
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<IEnumerable<IInternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
@@ -50,7 +67,14 @@ public class PostgresInternalCommandStore : IInternalCommandStore
 
         return commands.Select(x => DeserializeCommand(x));
     }
-
+    /// <summary>
+    /// update status of command in postgres database
+    /// </summary>
+    /// <param name="commandId"></param>
+    /// <param name="status"></param>
+    /// <param name="error"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task UpdateStatusAsync(Guid commandId, InternalCommandStatus status, string? error = null, CancellationToken cancellationToken = default)
     {
         var command = await _dbContext.InternalCommands.FindAsync(new object[] { commandId }, cancellationToken);
@@ -76,7 +100,12 @@ public class PostgresInternalCommandStore : IInternalCommandStore
         await _dbContext.SaveChangesAsync(cancellationToken);
         _logger.LogDebug("Command {CommandId} status updated to {Status}", commandId, status);
     }
-
+    /// <summary>
+    /// cleanup old commands from postgres database
+    /// </summary>
+    /// <param name="cutoffDate"></param>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task CleanupAsync(DateTime cutoffDate, CancellationToken cancellationToken = default)
     {
         var deletedCount = await _dbContext.InternalCommands
@@ -85,7 +114,11 @@ public class PostgresInternalCommandStore : IInternalCommandStore
 
         _logger.LogInformation("Cleaned up {Count} old commands", deletedCount);
     }
-
+    /// <summary>
+    /// get stats of commands from postgres database
+    /// </summary>
+    /// <param name="cancellationToken"></param>
+    /// <returns></returns>
     public async Task<InternalCommandStats> GetStatsAsync(CancellationToken cancellationToken = default)
     {
         var stats = new InternalCommandStats
@@ -110,4 +143,4 @@ public class PostgresInternalCommandStore : IInternalCommandStore
         var command = (IInternalCommand)JsonSerializer.Deserialize(entity.Data, type)!;
         return command;
     }
-} 
+}

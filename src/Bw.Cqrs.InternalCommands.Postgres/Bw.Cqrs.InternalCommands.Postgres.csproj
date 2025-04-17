@@ -6,6 +6,18 @@
     <Nullable>enable</Nullable>
     <RootNamespace>Bw.Cqrs.InternalCommands.Postgres</RootNamespace>
     <AssemblyName>Bw.Cqrs.InternalCommands.Postgres</AssemblyName>
+    
+    <!-- NuGet Package Information -->
+    <PackageId>bitwrite.cqrs.internalCommands.postgres</PackageId>
+    <Version>1.0.0</Version>
+    <Authors>Meysam Soleymani</Authors>
+    <Company>BitWrite</Company>
+    <Description>PostgreSQL storage provider for Bw.Cqrs internal commands. Provides reliable storage and processing of internal commands using PostgreSQL database.</Description>
+    <PackageTags>cqrs;postgres;postgresql;internal-commands;outbox-pattern;command-processing</PackageTags>
+    <PackageLicenseExpression>MIT</PackageLicenseExpression>
+    <PackageProjectUrl>https://github.com/yourusername/Bw.Cqrs</PackageProjectUrl>
+    <RepositoryUrl>https://github.com/yourusername/Bw.Cqrs</RepositoryUrl>
+    <GenerateDocumentationFile>true</GenerateDocumentationFile>
   </PropertyGroup>
 
   <ItemGroup>
