@@ -3,7 +3,7 @@ using Bw.Cqrs.Events.Base;
 
 namespace OrderManagement.Domain.Events;
 
-public class OrderCreatedEvent :Event
+public class OrderCreatedEvent : Event
 {
     public Guid OrderId { get; }
     public string OrderNumber { get; }
@@ -15,4 +15,4 @@ public class OrderCreatedEvent :Event
         OrderNumber = orderNumber;
         CreatedAt = createdAt;
     }
-} 
+}

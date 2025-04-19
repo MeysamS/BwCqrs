@@ -1,3 +1,4 @@
+using Bw.Cqrs.Commands.Base;
 using Bw.Cqrs.Commands.Enums;
 using Bw.Cqrs.Commands.Models;
 
@@ -11,12 +12,12 @@ public interface IInternalCommandStore
     /// <summary>
     /// Saves a command to the store
     /// </summary>
-    Task SaveAsync(IInternalCommand command, CancellationToken cancellationToken = default);
+    Task SaveAsync(InternalCommand command, CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Gets all commands that are ready to be executed
     /// </summary>
-    Task<IEnumerable<IInternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default);
+    Task<IEnumerable<InternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default);
 
     /// <summary>
     /// Updates the status of a command

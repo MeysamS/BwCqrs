@@ -1,5 +1,3 @@
-using System.Text.Json;
-using Bw.Cqrs.Commands.Base;
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Commands.Enums;
 using Bw.Cqrs.Commands.Models;
@@ -7,6 +5,8 @@ using Bw.Cqrs.InternalCommands.Postgres.Models;
 using Bw.Cqrs.InternalCommands.Postgres.Data;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
+using Bw.Cqrs.Commands.Base;
+using Newtonsoft.Json;
 
 namespace Bw.Cqrs.InternalCommands.Postgres.Services;
 
@@ -36,13 +36,13 @@ public class PostgresInternalCommandStore : IInternalCommandStore
     /// <param name="command"></param>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task SaveAsync(IInternalCommand command, CancellationToken cancellationToken = default)
+    public async Task SaveAsync(InternalCommand command, CancellationToken cancellationToken = default)
     {
         var entity = new CommandEntity
         {
-            Id = ((CommandBase)command).Id,
+            Id = command.Id,
             Type = command.GetType().AssemblyQualifiedName!,
-            Data = JsonSerializer.Serialize(command),
+            Data = JsonConvert.SerializeObject(command),
             ScheduledOn = command.ScheduledOn,
             Status = command.Status,
             CreatedAt = DateTime.UtcNow
@@ -58,7 +58,7 @@ public class PostgresInternalCommandStore : IInternalCommandStore
     /// </summary>
     /// <param name="cancellationToken"></param>
     /// <returns></returns>
-    public async Task<IEnumerable<IInternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
+    public async Task<IEnumerable<InternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
     {
         var now = DateTime.UtcNow;
         var commands = await _dbContext.InternalCommands
@@ -77,7 +77,7 @@ public class PostgresInternalCommandStore : IInternalCommandStore
     /// <returns></returns>
     public async Task UpdateStatusAsync(Guid commandId, InternalCommandStatus status, string? error = null, CancellationToken cancellationToken = default)
     {
-        var command = await _dbContext.InternalCommands.FindAsync(new object[] { commandId }, cancellationToken);
+        var command = await _dbContext.InternalCommands.FindAsync(commandId, cancellationToken);
         if (command == null)
         {
             _logger.LogWarning("Command {CommandId} not found for status update", commandId);
@@ -134,13 +134,15 @@ public class PostgresInternalCommandStore : IInternalCommandStore
         return stats;
     }
 
-    private static IInternalCommand DeserializeCommand(CommandEntity entity)
+    private static InternalCommand DeserializeCommand(CommandEntity entity)
     {
         var type = Type.GetType(entity.Type);
         if (type == null)
             throw new InvalidOperationException($"Type {entity.Type} not found");
 
-        var command = (IInternalCommand)JsonSerializer.Deserialize(entity.Data, type)!;
+
+        var command = (InternalCommand)JsonConvert.DeserializeObject(entity.Data, type)!;
+
         return command;
     }
 }

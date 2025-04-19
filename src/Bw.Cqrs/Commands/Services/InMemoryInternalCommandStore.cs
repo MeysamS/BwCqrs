@@ -12,7 +12,7 @@ namespace Bw.Cqrs.Commands.Services;
 /// </summary>
 public class InMemoryInternalCommandStore : IInternalCommandStore
 {
-    private readonly ConcurrentDictionary<Guid, IInternalCommand> _commands = new();
+    private readonly ConcurrentDictionary<Guid, InternalCommand> _commands = new();
     private readonly ILogger<InMemoryInternalCommandStore> _logger;
 
     /// <summary>
@@ -30,15 +30,15 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
     /// <param name="command">The command</param>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task</returns>
-    public Task SaveAsync(IInternalCommand command, CancellationToken cancellationToken = default)
+    public Task SaveAsync(InternalCommand command, CancellationToken cancellationToken = default)
     {
-        if (_commands.TryAdd(((CommandBase)command).Id, command))
+        if (_commands.TryAdd(command.Id, command))
         {
-            _logger.LogDebug("Command {CommandId} saved successfully", ((CommandBase)command).Id);
+            _logger.LogDebug("Command {CommandId} saved successfully", command.Id);
             return Task.CompletedTask;
         }
 
-        throw new InvalidOperationException($"Command with ID {((CommandBase)command).Id} already exists");
+        throw new InvalidOperationException($"Command with ID {command.Id} already exists");
     }
 
     /// <summary>
@@ -46,14 +46,14 @@ public class InMemoryInternalCommandStore : IInternalCommandStore
     /// </summary>
     /// <param name="cancellationToken">The cancellation token</param>
     /// <returns>A task</returns>
-    public Task<IEnumerable<IInternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
+    public Task<IEnumerable<InternalCommand>> GetCommandsToExecuteAsync(CancellationToken cancellationToken = default)
     {
         var commands = _commands.Values
             .Where(x => x is InternalCommand ic && ic.IsReadyToExecute())
             .ToList();
 
         _logger.LogDebug("Found {Count} commands ready to execute", commands.Count);
-        return Task.FromResult<IEnumerable<IInternalCommand>>(commands);
+        return Task.FromResult<IEnumerable<InternalCommand>>(commands);
     }
 
     /// <summary>

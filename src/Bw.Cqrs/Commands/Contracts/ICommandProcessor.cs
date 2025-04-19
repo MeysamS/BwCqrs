@@ -1,11 +1,12 @@
-﻿using Bw.Cqrs.Common.Results;
+﻿using Bw.Cqrs.Commands.Base;
+using Bw.Cqrs.Common.Results;
 
 namespace Bw.Cqrs.Commands.Contracts;
 
 /// <summary>
 /// Represents a command bus for dispatching commands
 /// </summary>
-public interface ICommandBus
+public interface ICommandProcessor
 {
     /// <summary>
     /// Dispatches a command asynchronously
@@ -37,5 +38,5 @@ public interface ICommandBus
     /// <typeparam name="TCommand">Type of the command</typeparam>
     /// <param name="command">Command to schedule</param>
     Task ScheduleAsync<TCommand>(TCommand command) 
-        where TCommand : IInternalCommand;
+        where TCommand : InternalCommand;
 }

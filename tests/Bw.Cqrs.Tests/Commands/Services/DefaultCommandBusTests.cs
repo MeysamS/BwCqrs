@@ -16,14 +16,14 @@ public class DefaultCommandBusTests
     private readonly Mock<ICommandHandlerFactory> _handlerFactoryMock;
     private readonly Mock<IServiceProvider> _serviceProviderMock;
     private readonly Mock<IInternalCommandStore> _commandStoreMock;
-    private readonly DefaultCommandBus _commandBus;
+    private readonly CommandProccesor _commandBus;
 
     public DefaultCommandBusTests()
     {
         _handlerFactoryMock = new Mock<ICommandHandlerFactory>();
         _serviceProviderMock = new Mock<IServiceProvider>();
         _commandStoreMock = new Mock<IInternalCommandStore>();
-        _commandBus = new DefaultCommandBus(_handlerFactoryMock.Object, _commandStoreMock.Object, _serviceProviderMock.Object);
+        _commandBus = new CommandProccesor(_handlerFactoryMock.Object, _commandStoreMock.Object, _serviceProviderMock.Object);
     }
 
 

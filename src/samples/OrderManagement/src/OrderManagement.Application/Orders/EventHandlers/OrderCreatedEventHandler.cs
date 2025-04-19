@@ -11,16 +11,16 @@ namespace OrderManagement.Application.Orders.EventHandlers;
 
 public class OrderCreatedEventHandler : IEventHandler<OrderCreatedEvent>
 {
-    private readonly ICommandBus _commandBus;
+    private readonly ICommandProcessor _commandProcessor;
     private readonly IOrderRepository _orderRepository;
     private readonly ILogger<OrderCreatedEventHandler> _logger;
 
     public OrderCreatedEventHandler(
-        ICommandBus commandBus,
+        ICommandProcessor commandBus,
         IOrderRepository orderRepository,
         ILogger<OrderCreatedEventHandler> logger)
     {
-        _commandBus = commandBus;
+        _commandProcessor = commandBus;
         _orderRepository = orderRepository;
         _logger = logger;
     }
@@ -43,7 +43,7 @@ public class OrderCreatedEventHandler : IEventHandler<OrderCreatedEvent>
             // In a real application, you would get the customer email from the order
             CustomerEmail = "customer@example.com"
         };
-        await _commandBus.ScheduleAsync(command);
+        await _commandProcessor.ScheduleAsync(command);
 
         _logger.LogInformation(
             "Order {OrderNumber} created and confirmation email scheduled",

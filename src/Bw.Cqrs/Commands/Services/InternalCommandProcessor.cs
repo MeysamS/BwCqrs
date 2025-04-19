@@ -2,7 +2,6 @@ using Bw.Cqrs.Commands.Base;
 using Bw.Cqrs.Commands.Configuration;
 using Bw.Cqrs.Commands.Contracts;
 using Bw.Cqrs.Commands.Enums;
-
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
@@ -64,7 +63,7 @@ public class InternalCommandProcessor : BackgroundService
     {
         using var scope = _serviceProvider.CreateScope();
         var store = scope.ServiceProvider.GetRequiredService<IInternalCommandStore>();
-        var commandBus = scope.ServiceProvider.GetRequiredService<ICommandBus>();
+        var commandProcessor = scope.ServiceProvider.GetRequiredService<ICommandProcessor>();
 
         var commands = await store.GetCommandsToExecuteAsync(stoppingToken);
 
@@ -72,7 +71,7 @@ public class InternalCommandProcessor : BackgroundService
         {
             try
             {
-                await ProcessCommandAsync(command, store, commandBus, stoppingToken);
+                await ProcessCommandAsync(command, store, commandProcessor, stoppingToken);
             }
             catch (Exception ex)
             {
@@ -82,34 +81,34 @@ public class InternalCommandProcessor : BackgroundService
     }
 
     private async Task ProcessCommandAsync(
-        IInternalCommand command, 
+        InternalCommand command,
         IInternalCommandStore store,
-        ICommandBus commandBus,
+        ICommandProcessor commandProcessor,
         CancellationToken stoppingToken)
     {
         try
         {
-            await store.UpdateStatusAsync(((CommandBase)command).Id, InternalCommandStatus.Processing, cancellationToken: stoppingToken);
-            
-            await commandBus.DispatchAsync(command);
-            
-            await store.UpdateStatusAsync(((CommandBase)command).Id, InternalCommandStatus.Processed, cancellationToken: stoppingToken);
-            
+            await store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processing, cancellationToken: stoppingToken);
+
+            await commandProcessor.DispatchAsync(command);
+
+            await store.UpdateStatusAsync(command.Id, InternalCommandStatus.Processed, cancellationToken: stoppingToken);
+
             _logger.LogInformation(
-                "Successfully processed command {CommandId} of type {CommandType}", 
-                ((CommandBase)command).Id, 
+                "Successfully processed command {CommandId} of type {CommandType}",
+                command.Id,
                 command.GetType().Name);
         }
         catch (Exception ex)
         {
             var error = ex.InnerException?.Message ?? ex.Message;
-            await store.UpdateStatusAsync(((CommandBase)command).Id, InternalCommandStatus.Failed, error, stoppingToken);
+            await store.UpdateStatusAsync(command.Id, InternalCommandStatus.Failed, error, stoppingToken);
 
-            if (command.RetryCount < _options.MaxRetries)   
+            if (command.RetryCount < _options.MaxRetries)
             {
                 _logger.LogWarning(
                     "Command {CommandId} failed (Attempt {RetryCount} of {MaxRetries}): {Error}",
-                    ((CommandBase)command).Id,
+                    command.Id,
                     command.RetryCount + 1,
                     _options.MaxRetries,
                     error);
@@ -118,7 +117,7 @@ public class InternalCommandProcessor : BackgroundService
             {
                 _logger.LogError(
                     "Command {CommandId} failed permanently after {MaxRetries} retries: {Error}",
-                    ((CommandBase)command).Id,
+                    command.Id,
                     _options.MaxRetries,
                     error);
             }
@@ -140,4 +139,4 @@ public class InternalCommandProcessor : BackgroundService
             _logger.LogError(ex, "Error cleaning up old commands");
         }
     }
-} 
+}

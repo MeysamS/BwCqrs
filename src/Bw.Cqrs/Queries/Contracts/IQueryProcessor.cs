@@ -3,7 +3,7 @@ namespace Bw.Cqrs.Queries.Contracts;
 /// <summary>
 /// Represents a query bus that can send queries and receive responses
 /// </summary>
-public interface IQueryBus
+public interface IQueryProcessor
 {
     /// <summary>
     /// Sends a query to the query bus and returns a response

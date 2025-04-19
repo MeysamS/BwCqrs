@@ -11,14 +11,14 @@ namespace OrderManagement.Application.Orders.Commands.CreateOrder;
 public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
 {
     private readonly IOrderRepository _orderRepository;
-    private readonly IEventBus _eventBus;
+    private readonly IEventProcessor _eventProcessor;
 
     public CreateOrderCommandHandler(
         IOrderRepository orderRepository,
-        IEventBus eventBus)
+        IEventProcessor eventBus)
     {
         _orderRepository = orderRepository;
-        _eventBus = eventBus;
+        _eventProcessor = eventBus;
     }
 
     public async Task<IResult> HandleAsync(CreateOrderCommand command, CancellationToken cancellationToken = default)
@@ -37,7 +37,7 @@ public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
             order.Id, 
             order.OrderNumber, 
             order.CreatedAt);
-        await _eventBus.PublishAsync(@event);
+        await _eventProcessor.PublishAsync(@event);
 
         return CommandResult.Success();
     }
