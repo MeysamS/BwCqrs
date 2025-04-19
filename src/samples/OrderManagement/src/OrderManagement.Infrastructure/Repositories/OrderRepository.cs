@@ -32,4 +32,9 @@ public class OrderRepository : IOrderRepository
         _context.Orders.Update(order);
         await _context.SaveChangesAsync();
     }
+
+    public async Task<IEnumerable<Order>> GetAllAsync()
+    {
+        return await _context.Orders.AsNoTracking().ToListAsync();
+    }
 } 

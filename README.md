@@ -2,6 +2,31 @@
 
 A lightweight, flexible, and feature-rich CQRS (Command Query Responsibility Segregation) framework built for .NET 9, designed to help you build scalable and maintainable applications. This library provides a clean, modern, and high-performance foundation for implementing the CQRS pattern with a focus on developer experience, performance, and enterprise-grade features.
 
+⚠️ **Notice**: For best experience and compatibility, please use the latest version of this library.  
+📦 **Current recommended version**: `v1.0.1`
+
+## 🆕 What's New in v1.0.1
+
+- ✨ **Renamed Interfaces** for better clarity and naming convention:
+  - `ICommandBus` → `ICommandProcessor`
+  - `IEventBus` → `IEventProcessor`
+  - `IQueryBus` → `IQueryProcessor`
+
+- 🛠 **InternalCommand Improvements**:
+  - Fixed handler resolution for `InternalCommand` types
+  - Tracked and updated execution status in DB properly
+
+- 🔄 **Serialization Fix**:
+  - Replaced `System.Text.Json` with `Newtonsoft.Json` to support parameterized constructors during deserialization
+
+- 🧰 **Dependency Injection Fixes**:
+  - Proper DI support for `IQuery` and `IQueryHandler`
+
+- 🔄 **Sample Updated**:
+  - Changes are also applied to the [`OrderManagement` sample project](https://github.com/MeysamS/BwCqrs/tree/main/src/samples/OrderManagement)
+
+For full details, see [Issue #8](https://github.com/MeysamS/BwCqrs/issues/8)
+
 ## Features
 
 ### Command Handling
@@ -261,27 +286,17 @@ public class NotifyAdminHandler : IEventHandler<UserCreatedEvent>
 
 #### Publishing Events
 ```csharp
-public class CreateUserCommandHandler : ICommandHandler<CreateUserCommand>
+public class CreateUserCommandHandler(IUserRepository userRepository, IEventProcessor eventProcessor) : ICommandHandler<CreateUserCommand>
 {
-    private readonly IUserRepository _userRepository;
-    private readonly IEventBus _eventBus;
-
-    public CreateUserCommandHandler(
-        IUserRepository userRepository,
-        IEventBus eventBus)
-    {
-        _userRepository = userRepository;
-        _eventBus = eventBus;
-    }
 
     public async Task<IResult> HandleAsync(CreateUserCommand command)
     {
         var user = new User(command.Data.Username, command.Data.Email);
-        await _userRepository.AddAsync(user);
+        await userRepository.AddAsync(user);
 
         // Publish the event
         var @event = new UserCreatedEvent(user.Username, user.Email);
-        await _eventBus.PublishAsync(@event);
+        await eventProcessor.PublishAsync(@event);
 
         return CommandResult.Success();
     }
@@ -337,19 +352,13 @@ services.AddBwCqrs(builder =>
 }, typeof(Program).Assembly);
 
 // Use in your code
-public class EmailService
+public class EmailService(ICommandProcessor commandProcessor)
 {
-    private readonly ICommandBus _commandBus;
-
-    public EmailService(ICommandBus commandBus)
-    {
-        _commandBus = commandBus;
-    }
 
     public async Task ScheduleEmailAsync(string to, string subject, string body)
     {
         var command = new SendEmailCommand(to, subject, body);
-        await _commandBus.ScheduleAsync(command);
+        await commandProcessor.ScheduleAsync(command);
     }
 }
 ```
@@ -545,35 +554,24 @@ services.AddBwCqrs(builder =>
 #### Usage Example
 
 ```csharp
-public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
+public class CreateOrderCommandHandler(IOrderRepository orderRepository, IEventProcessor eventProcessor) : ICommandHandler<CreateOrderCommand>
 {
-    private readonly IOrderRepository _orderRepository;
-    private readonly IEventBus _eventBus;
-
-    public CreateOrderCommandHandler(
-        IOrderRepository orderRepository,
-        IEventBus eventBus)
-    {
-        _orderRepository = orderRepository;
-        _eventBus = eventBus;
-    }
-
     public async Task<IResult> HandleAsync(CreateOrderCommand command)
     {
         // Transaction is automatically handled by the TransactionBehavior
         // If any operation fails, all changes will be rolled back
         
         var order = new Order(command.Data.CustomerName);
-        await _orderRepository.AddAsync(order);
+        await orderRepository.AddAsync(order);
         
         foreach (var item in command.Data.Items)
         {
             order.AddItem(item.ProductName, item.Quantity, item.UnitPrice);
-            await _orderRepository.UpdateAsync(order);
+            await orderRepository.UpdateAsync(order);
         }
         
         // Event will only be published if transaction succeeds
-        await _eventBus.PublishAsync(new OrderCreatedEvent(order.Id));
+        await eventProcessor.PublishAsync(new OrderCreatedEvent(order.Id));
         
         return CommandResult.Success();
     }
@@ -707,16 +705,8 @@ The sample project demonstrates:
    }
 
    // CreateOrderCommandHandler
-   public class CreateOrderCommandHandler : ICommandHandler<CreateOrderCommand>
+   public class CreateOrderCommandHandler(IOrderRepository orderRepository, IEventProcessor eventProcessor) : ICommandHandler<CreateOrderCommand>
    {
-       private readonly IOrderRepository _orderRepository;
-       private readonly IEventBus _eventBus;
-
-       public CreateOrderCommandHandler(IOrderRepository orderRepository, IEventBus eventBus)
-       {
-           _orderRepository = orderRepository;
-           _eventBus = eventBus;
-       }
 
        public async Task<IResult> HandleAsync(CreateOrderCommand command)
        {
@@ -726,10 +716,10 @@ The sample project demonstrates:
                order.AddItem(item.ProductName, item.Quantity, item.UnitPrice);
            }
            
-           await _orderRepository.AddAsync(order);
+           await orderRepository.AddAsync(order);
            
            // Publish event
-           await _eventBus.PublishAsync(new OrderCreatedEvent(order.Id, order.CustomerName));
+           await eventProcessor.PublishAsync(new OrderCreatedEvent(order.Id, order.CustomerName));
            
            return CommandResult.Success(order.Id);
        }

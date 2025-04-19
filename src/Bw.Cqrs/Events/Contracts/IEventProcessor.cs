@@ -3,7 +3,7 @@ namespace Bw.Cqrs.Events.Contracts;
 /// <summary>
 /// Represents the event bus for publishing events to registered handlers
 /// </summary>
-public interface IEventBus
+public interface IEventProcessor
 {
     /// <summary>
     /// Publishes the specified event to all registered handlers

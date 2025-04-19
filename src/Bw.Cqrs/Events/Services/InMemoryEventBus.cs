@@ -7,7 +7,7 @@ namespace Bw.Cqrs.Events.Services;
 /// <summary>
 /// In-memory implementation of the event bus that dispatches events to registered handlers
 /// </summary>
-public class InMemoryEventBus : IEventBus
+public class InMemoryEventBus : IEventProcessor
 {
     private readonly IServiceProvider _serviceProvider;
     private readonly ILogger<InMemoryEventBus> _logger;
@@ -63,7 +63,7 @@ public class InMemoryEventBus : IEventBus
         foreach (var @event in events)
         {
             // Use reflection to call the generic PublishAsync method
-            var method = typeof(IEventBus)
+            var method = typeof(IEventProcessor)
                 .GetMethod(nameof(PublishAsync), new[] { @event.GetType(), typeof(CancellationToken) });
 
             if (method == null)

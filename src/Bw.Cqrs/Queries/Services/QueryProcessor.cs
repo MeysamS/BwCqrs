@@ -6,7 +6,7 @@ namespace Bw.Cqrs.Queries.Services;
 /// <summary>
 /// Default implementation of IQueryBus
 /// </summary>
-public class DefaultQueryBus : IQueryBus
+public class QueryProcessor : IQueryProcessor
 {
     private readonly IServiceProvider _serviceProvider;
 
@@ -14,7 +14,7 @@ public class DefaultQueryBus : IQueryBus
     /// Initializes a new instance of the DefaultQueryBus class
     /// </summary>
     /// <param name="serviceProvider">The service provider</param>
-    public DefaultQueryBus(IServiceProvider serviceProvider)
+    public QueryProcessor(IServiceProvider serviceProvider)
     {
         _serviceProvider = serviceProvider;
     }

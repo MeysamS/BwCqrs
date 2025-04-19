@@ -10,8 +10,8 @@ using OrderManagement.Infrastructure.Repositories;
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
+builder.Services.AddControllers()
+    .AddNewtonsoftJson();builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen(c =>
 {
     c.SwaggerDoc("v1", new OpenApiInfo { Title = "Order Management API", Version = "v1" });
@@ -41,7 +41,7 @@ builder.Services.AddBwCqrs(builder =>
         {
             options.MaxRetries = 3;
             options.RetryDelaySeconds = 60;
-            options.ProcessingIntervalSeconds = 10;
+            options.ProcessingIntervalSeconds = 30;
             options.RetentionDays = 7;
         })
         .UsePostgres(options =>

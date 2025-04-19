@@ -24,8 +24,8 @@ public class ServiceCollectionExtensionsTests
         var serviceProvider = services.BuildServiceProvider();
 
         // Assert
-        serviceProvider.GetService<IEventBus>().Should().NotBeNull();
-        serviceProvider.GetService<IEventBus>().Should().BeOfType<InMemoryEventBus>();
+        serviceProvider.GetService<IEventProcessor>().Should().NotBeNull();
+        serviceProvider.GetService<IEventProcessor>().Should().BeOfType<InMemoryEventBus>();
     }
 
     [Fact]

@@ -11,6 +11,8 @@ using Bw.Cqrs.Commands.Configuration;
 using Bw.Cqrs.Commands.Contracts;
 using Microsoft.Extensions.Options;
 using System.Data;
+using Bw.Cqrs.Queries.Contracts;
+using Bw.Cqrs.Queries.Services;
 
 namespace Bw.Cqrs.Extensions;
 
@@ -29,8 +31,10 @@ public static class ServiceCollectionExtensions
     public static ICqrsBuilder AddBwCqrs(this IServiceCollection services, Action<ICqrsBuilder> configure, params Assembly[] assemblies)
     {
         // Register core services
-        services.AddScoped<ICommandBus, DefaultCommandBus>();
+        services.AddScoped<ICommandProcessor, CommandProccesor>();
+        services.AddScoped<IQueryProcessor, QueryProcessor>();
         services.AddScoped<ICommandHandlerFactory, CommandHandlerFactory>();
+        services.AddScoped<IQueryHandlerFactory, QueryHandlerFactory>();
         services.AddScoped<IInternalCommandStore, InMemoryInternalCommandStore>();
 
         // Register command handlers
@@ -133,7 +137,7 @@ public static class ServiceCollectionExtensions
     /// <returns>The CQRS builder for method chaining</returns>
     public static ICqrsBuilder AddEventHandling(this ICqrsBuilder builder)
     {
-        builder.Services.AddScoped<IEventBus, InMemoryEventBus>();
+        builder.Services.AddScoped<IEventProcessor, InMemoryEventBus>();
 
         // Register event handlers
         builder.Services.Scan(scan => scan
